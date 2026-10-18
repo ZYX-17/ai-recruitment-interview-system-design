@@ -22,43 +22,31 @@
     │   ├── 02-online-interview.md
     │   └── 03-resume-talent.md
     ├── 02-architecture.md            # v3.0 最终架构
-    ├── 03-development.md             # v3.0 开发契约与实现索引
-    └── 04-detailed-design/           # 详细设计参考资料（字段/接口/权限/容量）
-        ├── README.md
-        ├── 01-database.md
-        ├── 02-auth-rbac.md
-        ├── 03-ai.md
-        ├── 04-online-interview.md
-        ├── 05-api.md
-        ├── 06-deployment-plan.md
-        └── 07-requirements-traceability.md
+    └── 03-development.md             # v3.0 自包含开发文档
 ```
 
 ## 建议阅读顺序
 
-1. **需求基线**：先读 `docs/01-requirements/` 三份题目，确认三个子系统的边界与验收范围。
-2. **最终架构**：读 [`docs/02-architecture.md`](docs/02-architecture.md)，确认 v3.0 的技术路线：
+1. **需求基线**：读 `docs/01-requirements/` 三份题目，确认三个子系统的边界与验收范围。
+2. **最终架构**：读 [`docs/02-architecture.md`](docs/02-architecture.md)，确认 v3.0 技术路线：
    - vLLM Qwen2.5-7B-AWQ 主推理，云端/ Ollama / Mock 降级
    - Java 业务 + Python/FastAPI AI 编排 + ai-worker / mineru-worker
    - LiveKit SFU + Egress、1v1 / 1v5、ASR 20 路容量契约
    - 16 周计划、三人分工、runbook 与验收
-3. **工程契约**：读 [`docs/03-development.md`](docs/03-development.md)，用于并行开发：
-   - 服务与数据所有权、表名清单、API/事件/鉴权约定
-   - ASR WSS 协议、纪要触发、ES mapping、LiveKit/current_count/Refresh Token
-   - W1 冻结清单与测试验收
-4. **实现细节**：按需查 [`docs/04-detailed-design/`](docs/04-detailed-design/)：
-   - 数据库字段/索引、权限码、REST/WS 接口、AI 流水线、在线面试容量、部署与压测
-   - 该目录是早期详细设计参考，**服务/表名与 v3.0 有差异**；W1 需完成映射，禁止照抄或混用命名。
-5. **需求核对**：用 [`docs/04-detailed-design/07-requirements-traceability.md`](docs/04-detailed-design/07-requirements-traceability.md) 对照三份原始需求，按 v3.0 的 P0/P1/P2 重新标注。
+3. **开发落地**：读 [`docs/03-development.md`](docs/03-development.md)，按服务/数据库/API/鉴权/AI/ASR/在线面试/部署章节分工开发：
+   - 表清单与关键约束、核心 DDL 约定、API 端点与错误码
+   - 五角色 RBAC、权限码、数据范围、Refresh Token Key
+   - AI 任务/简历流水线/ES mapping/匹配/纪要/异步评分
+   - ASR WSS 协议与容量契约、LiveKit 房间/录制/笔记/防作弊
+   - 部署、验收口径与 W1 冻结清单
 
 ## 文档定位
 
 | 文档 | 定位 | 适合先看什么 |
 |---|---|---|
 | `docs/01-requirements/` | 需求基线 | 三个子系统的题目要求与验收范围 |
-| `docs/02-architecture.md` | **当前架构基线（v3.0）** | vLLM/FastAPI/硬件/ASR/16 周/分工 |
-| `docs/03-development.md` | **v3.0 工程契约与索引** | 服务/表名/API/事件/ASR/AI/验收 |
-| `docs/04-detailed-design/` | 详细设计参考 | DDL、接口、权限码、AI 流水线、容量与部署 |
+| [`docs/02-architecture.md`](docs/02-architecture.md) | **当前架构基线（v3.0）** | vLLM/FastAPI/硬件/ASR/16 周/分工 |
+| [`docs/03-development.md`](docs/03-development.md) | **v3.0 自包含开发文档** | 服务/表/API/权限/AI/ASR/部署/验收 |
 
 ## 当前待确认的关键决策
 
@@ -67,11 +55,10 @@
 3. **“1 对 5”人数口径**：按“1 位面试官 + 最多 5 位候选人 = 6 人”设计，需在需求评审确认。
 4. **ASR 容量**：单 ai-worker 目标 20 路；基线 5×1v1 + 5×1v5 = 40 路音频流，超出部分只保证会后转写；若要求全量实时字幕，需扩容并重测。
 5. **答辩硬件与网络**：应用节点内存、GPU 显存、LiveKit UDP/TURN 端口、校园网跨网连通性。
-6. **被裁剪/降级的需求**：Offer 审批、异步录播、批量排期、邮箱收简历、人才画像、人脸核验、虚拟背景/白板等，需要在需求追踪矩阵中明确优先级；实时字幕按 20 路容量契约降级。
+6. **被裁剪/降级的需求**：Offer 审批、异步录播、批量排期、邮箱收简历、人才画像、人脸核验、虚拟背景/白板等，需要在需求评审时明确优先级；实时字幕按 20 路容量契约降级。
 
 ## 说明
 
-- 早期路线方案与重复架构稿已移除，Git 历史仍可追溯；v3.0 架构 + 开发契约为唯一当前基线。
-- 详细设计目录中的 DDL/API 是参考实现，落地前必须按 v3.0 统一表名/服务名，再写 Flyway/OpenAPI。
+- 早期路线方案、重复架构稿与旧详细设计附录已移除；当前只有 v3.0 架构 + 自包含开发文档一套基线，Git 历史仍可追溯。
 - 文档中的端口、版本、容量数字为设计建议，落地前需以实际硬件、网络、模型版本压测校准。
 - 如需提交修改，请先更新接口/事件/数据库契约，再改实现与测试。

@@ -1,16 +1,10 @@
 # 招聘面试系统微服务架构设计方案（v3.0 · 最终版）
 
-> 版本 v3.0（最终版） | 编制：全栈架构交付专家团汇编修订 | 适用：毕业设计，**三人团队（1 人偏前端 + 2 人偏后端，均为全栈）**，16 周，Docker 部署（应用节点 + GPU 节点）
+> 版本 v3.0 | 适用：毕业设计，三人团队（1 人偏前端 + 2 人偏后端，均为全栈），16 周，Docker 双节点（应用节点 + GPU 节点）
 >
-> **历史修订记录（v2.0 / v2.1）**：以下两条保留用于追溯，最终技术口径以 v3.0 修订说明及正文为准。
+> **方案摘要**：vLLM（Qwen2.5-7B-Instruct-AWQ）主推理；Python/FastAPI AI 编排 + 两个 Python worker；7 个 Java 业务服务；应用节点 16C64G（最低 32GB）+ 24GB GPU；LiveKit 1v1/1v5 + Egress；ASR 浏览器麦克风 WSS、单实例 20 路容量契约；五角色 IAM；16 周计划与 runbook。
 >
-> **v2.0 修订说明**：依据团队真实构成与三份备选方案的对比评审结论修订——①媒体面由 SRS 更换为 **LiveKit + Egress**，群面（1 面试官+最多 5 候选人，房间上限 6 人）由 Won't 升为 Must；②auth-service 升级为完整 IAM（动态菜单 / 权限码 / 数据范围）；③AI 链路去除 GPU 硬依赖：云端 LLM 为主 + 本地 Ollama 兜底 + Mock 开发档（vLLM 仅作"有 GPU 时"增强档）；④排期冲突升级为候选人/面试官/资源三方校验；⑤新增第 8 章三人协作契约与第 7 章三人分工排期；⑥ASR 首选 FunASR（中文流式）。其余骨架（8 服务边界、本地消息表一致性方案、题目指定的 MinerU→Markdown→分块→BGE→ES 管线）保持 v1 不变。
->
-> **v2.1 修订说明（技术栈变更）**：**后端业务用 Java、AI 大模型调用用 Python**——ai-service 由 Java 改为 **Python 3.11 + FastAPI** 实现（openai SDK 统一调 DeepSeek/通义/Ollama/vLLM 四类 OpenAI 兼容端点），与 ai-worker、mineru-worker 同属 Python 技术面；服务边界、编排职责、对外契约（OpenAPI/事件）与四级降级路由全部不变。
->
-> **v3.0 修订说明（评审问题闭环·最终版）**：依据详细设计（`04-detailed-design/`）与多轮评审意见逐条闭环——①**vLLM 升为主线推理引擎**（Qwen2.5-7B-Instruct-AWQ，24GB GPU 节点；云端 LLM 降为备用，Ollama 仅作无 GPU 档，Mock 供开发/CI；无 GPU 时改 base-url 一键回退云主档）；②**硬件预算升级**：应用节点（推荐 16C64G，最低 32GB RAM）+ GPU 节点（24GB），旧 4C8G 口径废除；③**ASR 音频来源与并发写清**：浏览器本地麦克风采集 16kHz PCM → WSS 直达 ai-worker（scope=asr 短时令牌），每参会人一条流（1v5=6 路），FunASR 单实例目标 ≥20 路，超限降级会后补转写；④角色口径统一**五角色**；⑤三人工作量再平衡：notify 移交 BE-B；⑥细节同步开发文档（ES mapping/RRF、LiveKit 独立信令域与 UDP 直暴露、current_count 归还闭环、schedule_slot 唯一索引兜底、Refresh Token Redis Key 契约）；⑦**ASR 容量契约、纪要触发与面试笔记**：明确 20 路/实例与基线 40 路的降级边界，纪要改为 `room.finished` + 转写就绪触发（录像可选），补 `interview_note` 人工笔记。
->
-> 配套文档：[`03-development.md`](03-development.md)（v3.0 契约版）；详细设计参考：[`04-detailed-design/`](04-detailed-design/)（数据库/接口/鉴权/AI/在线面试/部署）
+> 配套文档：[`03-development.md`](03-development.md)（服务/数据库/API/鉴权/AI/ASR/在线面试/部署与验收）
 
 ## 1. 项目定义与成功标准
 
@@ -407,7 +401,7 @@ Actuator+Micrometer+Prometheus+Grafana；logback JSON 文件轮转；traceId 贯
 9. **事件治理升级**：事件信封规范（eventId/eventVersion/aggregateId/traceId）+ Schema 版本化 + publisher confirms。
 10. **一跳 Feign 原则 + `/internal/**` 网关屏蔽**。
 11. **（v2.1）ai-service 编排层语言：Java → Python/FastAPI**：大模型调用与编排归 Python——openai SDK 对 DeepSeek/通义/Ollama/vLLM 四类 OpenAI 兼容端点同构支持（换供应商只改 base-url+model），流式/重试/JSON Schema 生态成熟，且与 ai-worker/mineru-worker 同技术面，AI 侧三个工程收敛到 BE-B 一人；Java 业务侧经 OpenAPI 契约 Feign 调用（跨语言 REST，消费方无感知）。否决 Spring AI/Java 版 ai-service——LLM 生态 Python 优先，Java 侧实现无收益。
-12. **（v3.0）硬件预算升级**：旧 4C8G 单机口径废除。推荐应用节点 16C64G + GPU 节点（24GB 显存）双机；最低演示配置单台 32GB RAM + 24GB GPU。依据详细设计部署口径（`04-detailed-design/06-deployment-plan.md`：ES 4G 堆 + Java 4~6G + 中间件 + Egress 在 8G 内放不下）。
+12. **（v3.0）硬件预算升级**：旧 4C8G 单机口径废除。推荐应用节点 16C64G + GPU 节点（24GB 显存）双机；最低演示配置单台 32GB RAM + 24GB GPU。依据部署预算（ES 4G 堆 + Java 4~6G + 中间件 + Egress 在 8G 内放不下）。
 13. **（v3.0）ASR 音频来源与并发模型**：字幕音频 = 参会人浏览器本地麦克风采集（16kHz PCM 经 WSS 直达 ai-worker，room-service 签发 `scope=asr` 短时令牌），每参会人一条流（1v5=6 路），**不抓 LiveKit 混音轨**（重复/回声、无法区分说话人）；FunASR 单实例目标 ≥20 路（W1 压测校准），超限 `ASR_OVERLOAD` 降级为"暂停实时字幕 + 会后离线补转写"，面试不阻断。
 14. **（v3.0）团队分工再平衡**：notify-service 移交 BE-B（其 W5~6 排期本就承担通知实现）；BE-A 收敛为 4 服务 + 集成；消除"BE-A 5 服务 + 集成"的偏重。
 15. **（v3.0）LiveKit 与 ASR 接入路径**：信令 WSS 走独立子域名（或 `/livekit` 同域代理），UDP 50000-50100 直暴露给 LiveKit 节点不经过 Nginx，TURN/TCP 443 兜底；ASR WSS 由 Nginx 直达 ai-worker 不进网关，令牌由 AI 侧校验。
@@ -432,4 +426,4 @@ Actuator+Micrometer+Prometheus+Grafana；logback JSON 文件轮转；traceId 贯
 5. GPU 节点落实与规格（vLLM 主档前提：24GB 显存 + CUDA 驱动兼容；若最终未落实，改 base-url 切云 LLM 主档，链路其余不变）；
 6. 备份盘选型（数据盘 vs 对象存储异地）；
 7. ASR 单实例 20 路容量与基线 40 路降级策略需 W1 压测确认；若要求基线全量实时字幕，需增加 ai-worker 实例/GPU 并重测；
-8. v3.0 开发文档的详细 DDL/API 需与架构同步（当前为契约版，详细设计参考 `04-detailed-design/`；W1 统一表名映射与字段契约）。
+8. v3.0 开发文档的详细 DDL/API 见 [`03-development.md`](03-development.md)；W1 依据第 2 节表清单产出 Flyway V1，并冻结 OpenAPI。
