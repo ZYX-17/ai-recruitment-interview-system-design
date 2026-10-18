@@ -1,0 +1,64 @@
+digraph G {
+  graph [rankdir=TB, bgcolor="white", pad="0.22", nodesep="0.35", ranksep="0.48", splines=polyline, fontname="Noto Sans CJK SC", labelloc=t, label="招聘面试系统总体架构（逻辑视图）", fontsize=20, compound=true];
+  node [shape=box, style="rounded,filled", fillcolor="#F7FAFC", color="#7B8A9A", penwidth=1.1, fontname="Noto Sans CJK SC", fontsize=10, margin="0.15,0.08"];
+  edge [color="#65758B", penwidth=1.0, arrowsize=0.7, fontname="Noto Sans CJK SC", fontsize=9];
+
+  frontend [label="Vue 3 + TypeScript\n动态菜单 · 招聘后台 · 面试房间", fillcolor="#E8F2FF", color="#4384C5", width=3.8];
+  gateway [label="API Gateway（Spring Cloud Gateway）\n路由 · 请求 ID · 限流 · CORS", fillcolor="#E8F2FF", color="#4384C5", width=5.4];
+  frontend -> gateway [label="HTTPS / REST / SSE"];
+
+  subgraph cluster_java {
+    label="Java Spring Boot 业务微服务（独立部署、按领域划分）";
+    style="rounded,dashed"; color="#9BB7D5"; fontname="Noto Sans CJK SC"; fontsize=13; margin=18;
+    iam [label="IAM Service\n登录 / JWT / RBAC / 菜单", fillcolor="#EDF7ED", color="#6A9D69", width=2.55];
+    talent [label="Talent Service\n候选人 / 简历 / 岗位 / 检索", fillcolor="#EDF7ED", color="#6A9D69", width=2.55];
+    interview [label="Interview Service\n流程 / 排期 / 评价 / Offer", fillcolor="#EDF7ED", color="#6A9D69", width=2.55];
+    media [label="Media Control\n房间 / 入会授权 / 录制状态", fillcolor="#EDF7ED", color="#6A9D69", width=2.55];
+    ai [label="AI Orchestrator\nPrompt / Agent / Schema / 审计", fillcolor="#EDF7ED", color="#6A9D69", width=2.55];
+    notify [label="Notification Worker\n邮件 / 站内信 / 提醒（可后拆）", fillcolor="#F5F0FF", color="#8E7CC3", width=2.55];
+    {rank=same; iam; talent; interview;}
+    {rank=same; media; ai; notify;}
+    iam -> media [style=invis, weight=10];
+    talent -> ai [style=invis, weight=10];
+    interview -> notify [style=invis, weight=10];
+  }
+  gateway -> iam [lhead=cluster_java];
+  gateway -> talent [lhead=cluster_java];
+  gateway -> interview [lhead=cluster_java];
+  gateway -> media [lhead=cluster_java];
+  gateway -> ai [lhead=cluster_java];
+  gateway -> notify [lhead=cluster_java];
+  interview -> media [label="创建面试场次", constraint=false];
+
+  subgraph cluster_data {
+    label="数据与消息基础设施（逻辑分层）"; style="rounded,dashed"; color="#D1B28A"; fontname="Noto Sans CJK SC"; fontsize=13; margin=16;
+    mysql [label="MySQL 8.x\n事务主数据\n每服务独立 schema", fillcolor="#FFF4E5", color="#C58B3A", width=2.25];
+    redis [label="Redis\n限流 / 幂等 / 短期状态", fillcolor="#FFF4E5", color="#C58B3A", width=2.25];
+    rabbit [label="RabbitMQ\n异步任务 / 领域事件", fillcolor="#FFF4E5", color="#C58B3A", width=2.25];
+    es [label="Elasticsearch 8.x\n全文 / KNN / 混合检索", fillcolor="#FFF4E5", color="#C58B3A", width=2.25];
+    storage [label="对象存储（MinIO / S3）\n简历 / 解析产物 / 录像", fillcolor="#FFF4E5", color="#C58B3A", width=2.25];
+    {rank=same; mysql; redis; rabbit; es; storage;}
+    mysql -> redis -> rabbit -> es -> storage [style=invis, weight=15];
+  }
+  ai -> mysql [label="AI 任务记录", lhead=cluster_data];
+  talent -> es [label="索引由 Talent 管理", lhead=cluster_data];
+  talent -> storage [label="文件对象", lhead=cluster_data];
+  gateway -> redis [label="限流", lhead=cluster_data, style=dashed, constraint=false];
+
+  subgraph cluster_ai_media {
+    label="独立 AI / 实时媒体平面"; style="rounded,dashed"; color="#B7A6CE"; fontname="Noto Sans CJK SC"; fontsize=13; margin=16;
+    worker [label="Python FastAPI / Worker\nMinerU / Embedding / 可选 ASR", fillcolor="#F5F0FF", color="#8E7CC3", width=2.7];
+    vllm [label="vLLM\nOpenAI-compatible API（内网）", fillcolor="#F5F0FF", color="#8E7CC3", width=2.7];
+    livekit [label="LiveKit SFU\nWebRTC 音视频 / 数据通道", fillcolor="#E8F2FF", color="#4384C5", width=2.7];
+    egress [label="Egress Worker\n异步录制 / 导出", fillcolor="#E8F2FF", color="#4384C5", width=2.7];
+    {rank=same; worker; vllm; livekit; egress;}
+    worker -> vllm -> livekit -> egress [style=invis, weight=15];
+  }
+  ai -> vllm [label="模型推理 API", lhead=cluster_ai_media];
+  rabbit -> worker [label="消费解析/向量任务", lhead=cluster_ai_media];
+  worker -> rabbit [label="完成/失败事件", ltail=cluster_ai_media, constraint=false];
+  media -> livekit [label="Room API / Token / Webhook", lhead=cluster_ai_media];
+  frontend -> livekit [label="浏览器 WebRTC 直连", color="#4384C5", penwidth=1.4, constraint=false];
+  livekit -> egress [label="录制任务"];
+  egress -> storage [label="录像对象", lhead=cluster_data, constraint=false];
+}
