@@ -15,63 +15,63 @@
 
 ```
 .
-├── 1.题目-招聘面试系统之面试管理子系统的设计与实现(1).md
-├── 1.题目-招聘面试系统之在线面试子系统的设计与实现(1).md
-├── 1.题目-招聘面试系统之智能简历和人才管理子系统(1).md
-├── qyf-plant/                         # 架构与开发路线指导书（vLLM 主线）
-│   ├── interview_system_plan.md
-│   ├── interview_system_sources_README.txt
-│   └── interview_system_plan_assets/
-│       ├── architecture.png
-│       └── architecture.dot
-└── zyh-plant/                         # 详细设计文档（数据库/接口/鉴权/AI/在线面试）
-    ├── README.md
-    ├── 01-architecture.md
-    ├── 02-database.md
-    ├── 03-auth-rbac.md
-    ├── 04-ai.md
-    ├── 05-online-interview.md
-    ├── 06-api.md
-    ├── 07-deployment-plan.md
-    └── 08-requirements-traceability.md
+├── README.md
+└── docs/
+    ├── 01-requirements/              # 三份原始题目（需求基线）
+    │   ├── 01-interview-management.md
+    │   ├── 02-online-interview.md
+    │   └── 03-resume-talent.md
+    ├── 02-architecture.md            # v3.0 最终架构
+    ├── 03-development.md             # v3.0 开发契约与实现索引
+    └── 04-detailed-design/           # 详细设计参考资料（字段/接口/权限/容量）
+        ├── README.md
+        ├── 01-database.md
+        ├── 02-auth-rbac.md
+        ├── 03-ai.md
+        ├── 04-online-interview.md
+        ├── 05-api.md
+        ├── 06-deployment-plan.md
+        └── 07-requirements-traceability.md
 ```
 
 ## 建议阅读顺序
 
-1. 先看三份原始题目，确认三人的子系统边界与验收范围。
-2. 读 [`qyf-plant/interview_system_plan.md`](qyf-plant/interview_system_plan.md)，建立总体技术路线：
-   - vLLM 作为统一推理引擎
-   - Java 负责业务/权限/审计，FastAPI + Python worker 负责 MinerU/BGE/ASR
-   - 精简服务边界，P0/P1/P2 分级交付
-   - LiveKit SFU + Egress、1v1 / 1v5 容量目标、第一周技术 spike
-3. 再读 [`zyh-plant/README.md`](zyh-plant/README.md) 及其子文档，作为实现细节参考：
-   - 数据库表、索引、枚举、ES mapping
-   - 统一鉴权、角色/菜单/按钮/API 权限、数据范围
-   - REST/WS 接口、错误码、关键时序
-   - AI 流水线、MinerU 分块、BGE、混合检索、匹配、ASR、纪要
-   - LiveKit 房间、录制、防作弊、1v5 容量与压测
-   - Docker Compose、GPU 规划、16 周分工与验收
-4. 用 [`zyh-plant/08-requirements-traceability.md`](zyh-plant/08-requirements-traceability.md) 做需求覆盖核对，确认哪些是 MVP、哪些是增强项、哪些明确不做。
+1. **需求基线**：先读 `docs/01-requirements/` 三份题目，确认三个子系统的边界与验收范围。
+2. **最终架构**：读 [`docs/02-architecture.md`](docs/02-architecture.md)，确认 v3.0 的技术路线：
+   - vLLM Qwen2.5-7B-AWQ 主推理，云端/ Ollama / Mock 降级
+   - Java 业务 + Python/FastAPI AI 编排 + ai-worker / mineru-worker
+   - LiveKit SFU + Egress、1v1 / 1v5、ASR 20 路容量契约
+   - 16 周计划、三人分工、runbook 与验收
+3. **工程契约**：读 [`docs/03-development.md`](docs/03-development.md)，用于并行开发：
+   - 服务与数据所有权、表名清单、API/事件/鉴权约定
+   - ASR WSS 协议、纪要触发、ES mapping、LiveKit/current_count/Refresh Token
+   - W1 冻结清单与测试验收
+4. **实现细节**：按需查 [`docs/04-detailed-design/`](docs/04-detailed-design/)：
+   - 数据库字段/索引、权限码、REST/WS 接口、AI 流水线、在线面试容量、部署与压测
+   - 该目录是早期详细设计参考，**服务/表名与 v3.0 有差异**；W1 需完成映射，禁止照抄或混用命名。
+5. **需求核对**：用 [`docs/04-detailed-design/07-requirements-traceability.md`](docs/04-detailed-design/07-requirements-traceability.md) 对照三份原始需求，按 v3.0 的 P0/P1/P2 重新标注。
 
-## 两套文档的定位
+## 文档定位
 
 | 文档 | 定位 | 适合先看什么 |
 |---|---|---|
-| `qyf-plant/` | 架构与开发路线指导书 | 技术选型、AI 边界、服务拆分、P0/P1/P2、第一周 spike |
-| `zyh-plant/` | 详细设计文档 | 数据库 DDL、接口清单、权限码、AI 流水线、在线面试容量、部署与验收 |
-
-两套文档不是互相替代关系：前者偏“做什么、怎么分期、怎么验证”，后者偏“表怎么建、接口怎么定、权限怎么落、容量怎么算”。落地时建议先统一表名/服务名与接口契约，再分别引用。
+| `docs/01-requirements/` | 需求基线 | 三个子系统的题目要求与验收范围 |
+| `docs/02-architecture.md` | **当前架构基线（v3.0）** | vLLM/FastAPI/硬件/ASR/16 周/分工 |
+| `docs/03-development.md` | **v3.0 工程契约与索引** | 服务/表名/API/事件/ASR/AI/验收 |
+| `docs/04-detailed-design/` | 详细设计参考 | DDL、接口、权限码、AI 流水线、容量与部署 |
 
 ## 当前待确认的关键决策
 
-1. **vLLM 是否作为硬性主推理引擎**（当前 `qyf-plant` 方案为 vLLM 主线；无 GPU 时需要共享推理/租用 GPU/Mock 策略）。
-2. **FastAPI 的边界**：是作为所有 AI 能力的统一网关，还是只承接 MinerU / BGE / ASR 等 Python 生态任务。
+1. **GPU 可用性与 vLLM 显存**：v3.0 按 vLLM 主档编写（Qwen2.5-7B-AWQ / 24GB）；`max-model-len 16384` + `max-num-seqs 24` 的真实显存/并发需 W1 压测；拿不到 GPU 则切云主档，只改 base-url。
+2. **FastAPI 边界**：v3.0 已定为 Python/FastAPI ai-service（LLM/ASR/Embedding 收口），需和导师确认与“FastAPI 做 AI 处理”的口径一致。
 3. **“1 对 5”人数口径**：按“1 位面试官 + 最多 5 位候选人 = 6 人”设计，需在需求评审确认。
-4. **答辩硬件与网络**：应用节点内存、GPU 显存、LiveKit UDP/TURN 端口、校园网跨网连通性。
-5. **被裁剪/降级的需求**：Offer 审批、批量排期、邮箱收简历、实时字幕、人才画像、人脸核验、虚拟背景/白板等，需要在需求追踪矩阵中明确优先级。
+4. **ASR 容量**：单 ai-worker 目标 20 路；基线 5×1v1 + 5×1v5 = 40 路音频流，超出部分只保证会后转写；若要求全量实时字幕，需扩容并重测。
+5. **答辩硬件与网络**：应用节点内存、GPU 显存、LiveKit UDP/TURN 端口、校园网跨网连通性。
+6. **被裁剪/降级的需求**：Offer 审批、异步录播、批量排期、邮箱收简历、人才画像、人脸核验、虚拟背景/白板等，需要在需求追踪矩阵中明确优先级；实时字幕按 20 路容量契约降级。
 
 ## 说明
 
-- 架构图源文件在 `qyf-plant/interview_system_plan_assets/architecture.dot`，可用 Graphviz 重新生成。
+- 早期路线方案与重复架构稿已移除，Git 历史仍可追溯；v3.0 架构 + 开发契约为唯一当前基线。
+- 详细设计目录中的 DDL/API 是参考实现，落地前必须按 v3.0 统一表名/服务名，再写 Flyway/OpenAPI。
 - 文档中的端口、版本、容量数字为设计建议，落地前需以实际硬件、网络、模型版本压测校准。
 - 如需提交修改，请先更新接口/事件/数据库契约，再改实现与测试。

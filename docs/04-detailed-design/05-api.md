@@ -214,7 +214,7 @@ Cookie: refreshToken=...
 | DELETE | `/api/system/menus/{id}` | `system:menu:delete` | 删除 |
 | GET | `/api/system/permissions` | `system:menu:view` | 权限注册表（码/名称/服务/API） |
 
-`GET /api/system/menus/routes?app=ADMIN` 返回 `routes[] + permissions[]`，结构见 [03-auth-rbac.md](03-auth-rbac.md) 5.4。
+`GET /api/system/menus/routes?app=ADMIN` 返回 `routes[] + permissions[]`，结构见 [02-auth-rbac.md](02-auth-rbac.md) 5.4。
 
 ### 3.2 角色与用户
 
@@ -1057,7 +1057,7 @@ X-Internal-Signature: ...
 WSS /api/ai/v1/asr/stream?token={roomAsrToken}
 ```
 
-协议见 [04-ai.md](04-ai.md) 7.1；令牌由 `POST /api/room/rooms/{roomNo}/ai-token` 获取。
+协议见 [03-ai.md](03-ai.md) 7.1；令牌由 `POST /api/room/rooms/{roomNo}/ai-token` 获取。
 
 ---
 

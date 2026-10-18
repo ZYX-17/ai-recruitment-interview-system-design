@@ -451,7 +451,7 @@ CREATE TABLE auth_login_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 ```
 
-> 令牌、验证码、刷新令牌族、权限缓存全部在 Redis，不落 MySQL；Key 规范见 [03-auth-rbac.md](03-auth-rbac.md)。
+> 令牌、验证码、刷新令牌族、权限缓存全部在 Redis，不落 MySQL；Key 规范见 [02-auth-rbac.md](02-auth-rbac.md)。
 
 ---
 
@@ -1064,7 +1064,7 @@ CREATE TABLE cand_screening_rule (
   id          BIGINT UNSIGNED NOT NULL,
   job_id      BIGINT UNSIGNED NOT NULL,
   rule_name   VARCHAR(128)    NOT NULL,
-  rules_json  JSON            NOT NULL COMMENT 'DSL，见 04-ai.md',
+  rules_json  JSON            NOT NULL COMMENT 'DSL，见 03-ai.md',
   match_mode  VARCHAR(8)      NOT NULL DEFAULT 'ALL' COMMENT 'ALL/ANY',
   priority    INT             NOT NULL DEFAULT 0,
   enabled     TINYINT         NOT NULL DEFAULT 1,
@@ -2065,7 +2065,7 @@ VALUES (111, 110, 'ADMIN', 'F', '新建排期', NULL, NULL, NULL, 'interview:sch
 INSERT INTO sys_role_menu (id, role_id, menu_id) VALUES (1001, 3, 110), (1002, 3, 111);
 ```
 
-完整权限码清单见 [03-auth-rbac.md](03-auth-rbac.md)。
+完整权限码清单见 [02-auth-rbac.md](02-auth-rbac.md)。
 
 ### 8.3 流程模板与评价模板
 

@@ -1,0 +1,435 @@
+# 招聘面试系统微服务架构设计方案（v3.0 · 最终版）
+
+> 版本 v3.0（最终版） | 编制：全栈架构交付专家团汇编修订 | 适用：毕业设计，**三人团队（1 人偏前端 + 2 人偏后端，均为全栈）**，16 周，Docker 部署（应用节点 + GPU 节点）
+>
+> **历史修订记录（v2.0 / v2.1）**：以下两条保留用于追溯，最终技术口径以 v3.0 修订说明及正文为准。
+>
+> **v2.0 修订说明**：依据团队真实构成与三份备选方案的对比评审结论修订——①媒体面由 SRS 更换为 **LiveKit + Egress**，群面（1 面试官+最多 5 候选人，房间上限 6 人）由 Won't 升为 Must；②auth-service 升级为完整 IAM（动态菜单 / 权限码 / 数据范围）；③AI 链路去除 GPU 硬依赖：云端 LLM 为主 + 本地 Ollama 兜底 + Mock 开发档（vLLM 仅作"有 GPU 时"增强档）；④排期冲突升级为候选人/面试官/资源三方校验；⑤新增第 8 章三人协作契约与第 7 章三人分工排期；⑥ASR 首选 FunASR（中文流式）。其余骨架（8 服务边界、本地消息表一致性方案、题目指定的 MinerU→Markdown→分块→BGE→ES 管线）保持 v1 不变。
+>
+> **v2.1 修订说明（技术栈变更）**：**后端业务用 Java、AI 大模型调用用 Python**——ai-service 由 Java 改为 **Python 3.11 + FastAPI** 实现（openai SDK 统一调 DeepSeek/通义/Ollama/vLLM 四类 OpenAI 兼容端点），与 ai-worker、mineru-worker 同属 Python 技术面；服务边界、编排职责、对外契约（OpenAPI/事件）与四级降级路由全部不变。
+>
+> **v3.0 修订说明（评审问题闭环·最终版）**：依据详细设计（`04-detailed-design/`）与多轮评审意见逐条闭环——①**vLLM 升为主线推理引擎**（Qwen2.5-7B-Instruct-AWQ，24GB GPU 节点；云端 LLM 降为备用，Ollama 仅作无 GPU 档，Mock 供开发/CI；无 GPU 时改 base-url 一键回退云主档）；②**硬件预算升级**：应用节点（推荐 16C64G，最低 32GB RAM）+ GPU 节点（24GB），旧 4C8G 口径废除；③**ASR 音频来源与并发写清**：浏览器本地麦克风采集 16kHz PCM → WSS 直达 ai-worker（scope=asr 短时令牌），每参会人一条流（1v5=6 路），FunASR 单实例目标 ≥20 路，超限降级会后补转写；④角色口径统一**五角色**；⑤三人工作量再平衡：notify 移交 BE-B；⑥细节同步开发文档（ES mapping/RRF、LiveKit 独立信令域与 UDP 直暴露、current_count 归还闭环、schedule_slot 唯一索引兜底、Refresh Token Redis Key 契约）；⑦**ASR 容量契约、纪要触发与面试笔记**：明确 20 路/实例与基线 40 路的降级边界，纪要改为 `room.finished` + 转写就绪触发（录像可选），补 `interview_note` 人工笔记。
+>
+> 配套文档：[`03-development.md`](03-development.md)（v3.0 契约版）；详细设计参考：[`04-detailed-design/`](04-detailed-design/)（数据库/接口/鉴权/AI/在线面试/部署）
+
+## 1. 项目定义与成功标准
+
+**一句话定义**：面向中小企业招聘场景的微服务面试系统，覆盖"智能简历解析与人才管理 → 面试流程管理 → 在线视频面试（1v1/1v5）"全链路，后端业务采用 Java 技术栈（Spring Boot 3 / Spring Cloud Alibaba），AI 大模型调用层采用 Python（FastAPI + openai SDK，**vLLM 本地推理为主线**），前端 Vue 3 实现，AI 能力贯穿简历筛选、面试转写与评价环节。
+
+**可度量成功标准**：
+
+1. 候选人链路 30 分钟现场走通：上传简历 → AI 筛选 → 收邀约 → 视频面试 → 查进度 → Offer 确认；
+2. HR 链路走通：建岗位 → 收简历 → AI 匹配排序 → 排期（三方冲突拦截）→ 评价汇总 → 发 Offer → 人才归档；
+3. 在线面试链路走通：排期驱动建房 → 1v1 与 1v5 两种房间稳定通话 ≥10 分钟 → 屏幕共享/聊天 → 录制可回放 → AI 纪要草稿可人工复核；
+4. AI 环节至少 2 项量化数据（匹配 Top5 命中率 ≥80%、实体抽取 F1 ≥85%、纪要要点覆盖率 ≥80%、ASR CER ≤0.15）；
+5. 平台治理演示点：管理员勾选角色菜单后权限即时生效；前端隐藏按钮后直接调 API 仍返回 403；
+6. **三人均有独立可答辩的子系统成果**（智能简历与人才管理 / 面试管理 / 在线面试，每人一条论文主线与演示闭环）。
+
+## 2. 总体架构与服务划分
+
+### 2.1 分层架构图
+
+```mermaid
+flowchart TB
+    subgraph L1[接入层]
+        WEB[Vue3 单 SPA · 五角色动态菜单<br/>候选人/面试官/招聘专员/HR/管理员]
+    end
+    subgraph L2[网关层]
+        GW[gateway-service<br/>路由 / JWT验签前置 / 限流 / 内部接口屏蔽]
+    end
+    subgraph L3[业务服务层 · Java / Spring Boot 3]
+        AUTH[auth-service (IAM)<br/>用户·角色·动态菜单·权限码·数据范围·审计]
+        ITW[interview-service<br/>面试管理子系统]
+        ROOM[room-service<br/>在线面试·房间业务·LiveKit令牌·录制编排]
+        RSM[resume-service<br/>简历与人才管理子系统]
+        NTF[notify-service<br/>邮件/站内信]
+        FILE[file-service<br/>对象存储适配]
+    end
+    subgraph L4[中间件层]
+        NACOS[Nacos 注册+配置中心]
+        MQ[RabbitMQ 3.13<br/>publisher confirms + 延迟插件]
+        REDIS[Redis 7.2]
+    end
+    subgraph L5[数据层]
+        MySQL[(MySQL 8.0 · 7库逻辑隔离)]
+        ES[(Elasticsearch 8.13<br/>向量+全文检索)]
+        MINIO[(MinIO 对象存储)]
+    end
+    subgraph L6[AI 智能面 · Python]
+        AIS[ai-service (Python/FastAPI)<br/>LLM编排·降级路由·Prompt版本·调用审计]
+        WRK[ai-worker<br/>FunASR 流式ASR·BGE Embedding]
+        MWRK[mineru-worker (Python)<br/>MinerU 解析·低频重任务]
+        LLM[vLLM Qwen2.5-7B-AWQ 主·GPU 节点<br/>云端 DeepSeek/通义 备<br/>Ollama 无GPU档·Mock 开发档]
+    end
+    subgraph MEDIA[实时媒体面 · 独立于业务信令]
+        LK[LiveKit SFU<br/>WebRTC·1v1/1v5·Simulcast]
+        EGR[LiveKit Egress<br/>房间合成录制→MP4]
+    end
+
+    WEB --> GW
+    WEB -- "WebRTC 媒体流(浏览器直连)" --> LK
+    GW --> AUTH & ITW & ROOM & RSM & AIS & NTF & FILE
+    WEB -- "WSS 聊天/字幕/系统事件" --> ROOM
+    WEB -- "ASR WSS(本地麦克风 PCM, scope=asr)" --> WRK
+    WRK -. "final 分段" .-> AIS
+    ROOM -- "Java SDK: 建房/令牌" --> LK
+    LK -- "Webhook(签名验证)" --> ROOM
+    LK --> EGR
+    EGR -- "录像文件" --> MINIO
+    ITW <--> RSM
+    ITW --> NTF
+    ROOM --> AIS & FILE
+    RSM --> AIS & FILE & ES & MySQL
+    AIS --> LLM
+    AIS --> WRK & MWRK
+    FILE --> MINIO
+```
+
+### 2.2 四条核心架构原则
+
+1. **媒体面与信令面分离**：WebRTC 音视频与 SDP 信令由 LiveKit 客户端 SDK 与 LiveKit 服务器直接完成，不经过网关与 Java 服务；Java 只做房间业务状态、入会授权（令牌签发）、Webhook 事件处理与录制编排。
+2. **AI 能力统一收口**：所有 LLM/ASR/Embedding 调用收敛到 ai-service（**Python/FastAPI 编排**：鉴权、配额、超时、降级、审计、人工复核状态）；Python worker 只做无状态推理。**不允许任何业务 Controller 绕过编排层直连模型**；AI 输出一律为"草稿"，经人工确认才写入正式业务状态。
+3. **简历解析异步流水线**：上传 → MinIO → MQ 任务 → MinerU 解析 → 结构化 Markdown 入 MySQL → 分块（表格独立切块）→ BGE 向量化 → ES 索引，全链路事件驱动，前端轮询任务状态。
+4. **契约先行（团队原则）**：跨服务 API 用 OpenAPI 描述、事件用 Schema 登记，先改契约再写代码；契约变更必须 PR 评审；每周五合并可演示版本并打 tag（详见第 8 章）。
+
+### 2.3 服务划分（7 个 Java 服务 + ai-service（Python/FastAPI）+ 2 个 Python worker）
+
+| 服务                 | 中文名              | 一句话职责                                                                                                 | 归属       | Owner              |
+| ------------------ | ---------------- | ----------------------------------------------------------------------------------------------------- | -------- | ------------------ |
+| gateway-service    | 统一网关             | 路由、JWT 验签前置、角色粗校验、IP+用户令牌桶限流、`/internal/**` 外部屏蔽、traceId 生成                                           | 公共       | BE-A               |
+| auth-service (IAM) | 身份与权限中心          | 登录/令牌签发与轮换、用户、角色、**动态菜单/按钮/API 权限码、数据范围**、操作审计                                                        | 公共       | BE-A               |
+| interview-service  | 面试管理             | 流程阶段配置、候选人状态机、排期三方冲突校验、评价表（模板版本化）、Offer、评价对比、AI 纪要存储                                                  | 子系统一     | BE-A               |
+| room-service       | 在线面试房间           | 房间业务状态机（CREATED→WAITING→LIVE→FINISHED）、LiveKit 令牌签发与名额校验、Webhook 处理、WS 聊天/字幕/系统事件、Egress 录制编排、防作弊事件采集 | 子系统二     | BE-A（后端）+ FE（房间前端） |
+| resume-service     | 简历与人才管理          | 简历接入、解析编排、向量去重、标签、硬过滤规则引擎、人岗匹配、人才库                                                                    | 子系统三     | BE-B               |
+| ai-service（Python/FastAPI） | AI 能力编排     | LLM/ASR/Embedding 统一接入与路由（云→Ollama→模板）、Prompt 版本管理、实体抽取、匹配精排、纪要、画像、录播评分、调用审计                          | 公共 AI 底座 | BE-B               |
+| notify-service     | 通知服务             | 邮件/站内信统一发送（短信 Mock）、模板管理、失败重试                                                                         | 公共       | BE-B（v3.0 起移交）  |
+| file-service       | 文件服务             | 上传下载、预签名 URL（10min）、MIME/大小/内容校验                                                                      | 公共       | BE-B               |
+| ai-worker          | Python 推理 worker | FunASR 流式 ASR、BGE Embedding（无状态，高频轻推理）                                                                | AI 智能面   | BE-B               |
+| mineru-worker      | Python 解析 worker | MinerU 文档解析（低频重任务，独立容器隔离）                                                                             | AI 智能面   | BE-B               |
+
+**限界上下文推导**：身份与权限→auth(IAM)；招聘流程→interview（状态机集中）；实时会话→room（媒体控制面与普通 CRUD 的资源与故障特征不同，必须独立）；人才档案→resume；AI 能力→ai（模型供应商是最大不确定变量，收口隔离）；通知→notify；文件→file；边界接入→gateway。
+
+**Owner 再平衡（v3.0）**：BE-A = gateway/auth(IAM)/interview/room（4 服务，兼集成负责人）；BE-B = resume/ai-service/file/notify（4 Java 服务）+ ai-worker/mineru-worker（2 Python worker，AI 侧共 3 个 Python 工程，兼部署负责人）——notify 从 BE-A 移交 BE-B（其 W5~6 排期本就承担通知实现），消除"BE-A 5 服务+集成"的偏重；FE 不变。
+
+> 风险提示：BE-B 仍承担 resume/ai/file/notify + 3 个 Python 工程 + 部署，W5~6（通知）与 W9~10（AI 收口）是峰值；file/notify 尽量用脚手架/模板，避免 BE-B 成为新的单点瓶颈。
+
+**在线面试职责拆分（v2 更新）**：
+
+- **媒体信令（SDP/ICE）**：LiveKit 客户端 SDK 与 LiveKit 服务器直连完成，Java 不参与转发——room-service 不再承担信令转发；
+- **房间业务管理**：room-service 负责房间创建（`interview.scheduled` 事件驱动）、名额校验（ONE_TO_ONE 上限 2 / ONE_TO_MANY 上限 6）、**LiveKit 短期令牌签发**（Java livekit-server SDK，令牌只授予指定 room+identity+能力）、房间状态机、Webhook（入会/离会/录制，验签+幂等）；
+- **聊天/字幕/系统事件**：room-service WebSocket（`/ws/room/{roomId}`，JWT 首帧鉴权）——聊天落库后广播；字幕音频来源为**参会人浏览器本地麦克风采集**（AudioWorklet，16kHz/16bit/单声道 PCM，100~200ms/帧）→ Nginx WSS 直达 ai-worker `/ws/asr/{sessionId}`（room-service 签发 `scope=asr` 短时令牌 5min，绑定 room/user/role，AI 侧自行校验）→ final 段经 ai-service → room-service WS 广播；**不抓取 LiveKit 混音轨**，每参会人一条流，说话人按音频来源标注（1v5=6 路）；实时字幕容量按 ai-worker 实例计，单实例目标 ≥20 路，超出 `ASR_OVERLOAD` 降级会后补转写（容量契约见 5.4）；系统事件由 Webhook 转换推送；
+- **面试笔记**：room-service 提供 `interview_note` 的新增/编辑/查询，笔记与面试记录关联；面试官可实时记录，AI 纪要只作补充，不替代人工笔记；
+- **录制**：LiveKit Egress 房间合成录制 → MP4 落 MinIO；录制状态与面试业务状态分离（录制失败不阻塞面试结束，支持重试）；
+- **AI 转写/纪要**：ai-service 消费 `room.finished`（转写就绪）事件：优先使用实时转写，录像可用时补转写；LLM 纪要/评价草稿 → 回写 interview 库（评分评语归面试管理，避免双写）。`recording.completed` 仍用于录像资产登记与可选补转写，**不作为纪要的唯一触发条件**；录制关闭/失败/未同意时仍可用转写文本生成草稿。
+
+**子系统数据归属裁决**（同 v1）：在线面试只产出录像文件（对象存储）与转写/纪要（回写挂到面试记录）；人才域以候选人 Person 为聚合根，简历管理管"一次简历实例"，人才库管"跨流程 Person 档案"。
+
+## 3. 通信方式设计
+
+### 3.1 同步调用（OpenFeign + Spring LoadBalancer）
+
+- 适用：需即时结果的用户请求链路；服务间一律走 Feign + Nacos 直连（不过网关）。
+- **一跳原则（新增）**：只允许一跳业务 Feign，禁止 A→B→C 同步链；读多服务数据用快照字段或聚合接口。
+- 超时/重试：连接 2s / 读 3s；幂等 GET 自动重试 1 次；POST 不自动重试（由幂等键保证）。
+- **内部接口统一 `/internal/**`**（如 LiveKit Webhook、AI 回调），网关层对外屏蔽。
+- AI 链路超时漏斗：浏览器 → Nginx 40s → gateway 40s → 业务服务对 ai-service（FastAPI）Feign 35s（OpenAPI 契约声明式调用，跨语言 REST 无感知）→ LLM 客户端内部预算 30s + 1 次降级重试。
+
+### 3.2 异步事件（RabbitMQ 3.13）
+
+**MQ 选型**（同 v1）：RabbitMQ 3.13。否决 RocketMQ（资源与运维超单机预算）、Kafka（过度设计）。延迟消息用官方插件（人才回访提醒）。
+
+**可靠性规范（v2 新增）**：生产者开启 **publisher confirms**；消费者手动 ack；消息持久化（delivery-mode=2）+ 队列持久化；消费失败有限重试（指数退避）后入死信队列，管理后台补偿页支持人工重放。
+
+**事件信封规范（v2 新增）**：
+
+```json
+{
+  "eventId": "uuid（消费幂等键）",
+  "eventType": "interview.scheduled",
+  "eventVersion": 1,
+  "occurredAt": "2026-11-02T02:00:00Z",
+  "traceId": "…",
+  "aggregateId": "applicationId（同一聚合分区内有序）",
+  "payload": { "只带 ID 与必要快照；消费方需更多数据时回查 API" }
+}
+```
+
+**Schema 版本化规则**：事件字段只增不改、不删旧字段；新增事件先登记到《开发文档》事件清单再编码。
+
+**关键业务事件（15 个；`job.published` / `job.updated` 合并展示）**：
+
+| 事件                         | 载荷摘要                            | 发布方 → 订阅方                                             |
+| -------------------------- | ------------------------------- | ----------------------------------------------------- |
+| resume.received            | resumeId, channel, fileKey      | resume → resume(解析任务)                                 |
+| resume.parse.completed     | resumeId, candidateId, 状态       | resume → resume(向量化/ES)、ai(实体抽取)                      |
+| resume.parse.failed        | resumeId, 失败原因, attempt         | resume → notify(HR 可见失败状态)                            |
+| candidate.duplicated       | 主档案id, 重复ids, 相似度               | resume → notify(HR 查重提醒)                              |
+| job.published / job.updated | jobId, version, status            | interview → resume(更新 JD 快照/匹配缓存；关闭岗位停止推荐)        |
+| interview.scheduled        | interviewId, 时间, 面试官ids, roomId | interview → notify、room(建房)                           |
+| interview.canceled         | interviewId, roomId             | interview → room(关房)、notify                           |
+| interview.result.submitted | interviewId, 轮次, 结果, 评分         | interview → notify、ai(画像)                             |
+| recording.completed        | roomId, recordFileKey, 时长       | room(LiveKit webhook 转换) → interview(录像登记)、ai(可选补转写) |
+| room.finished              | roomId, interviewId, transcriptStatus, endedAt | room → ai(纪要/评价草稿)、interview(更新面试记录) |
+| offer.confirmed            | offerId, candidateId, 入职日期      | interview → notify、resume(人才库状态)                      |
+| talent.followup.due        | talentId, 提醒内容                  | resume(延迟消息) → notify                                 |
+| ai.task.failed             | taskId, capability, 失败原因        | ai → 对应业务服务(标记失败可重试)                                  |
+| notification.requested     | 模板code, 接收人, 业务ID               | 各服务 → notify(统一通知请求)                                  |
+
+### 3.3 实时通信（v2 收窄）
+
+- **媒体信令**：LiveKit 客户端 SDK 原生完成（浏览器 ↔ LiveKit 7880 端口），Java 不参与；
+- **WebSocket（room-service，独立端口）**：`/ws/room/{roomId}`，JWT 首帧鉴权；承载三类消息——CHAT（落库后广播）、SUBTITLE（FunASR 转写流，seq 保序）、SYSTEM（JOIN/LEAVE/RECORD_STARTED 等，由 LiveKit Webhook 转换）；
+- 心跳 15s ping / 30s 判离线；客户端指数退避重连（1s→30s）；断线期间 LiveKit 媒体层自动重连，业务 WS 恢复后拉离线聊天（字幕不回补）。
+
+### 3.4 统一网关
+
+Spring Cloud Gateway：按服务前缀路由；JWT 验签 + 角色粗校验（细粒度各服务权限码校验）；白名单（登录/注册/refresh、`/api/offer-portal/**`）；**`/internal/**` 一律 403 对外屏蔽**（LiveKit Webhook 走验签而非公网开放）；IP 级 + 用户级令牌桶限流（Redis）；验签后注入 `X-User-Uid / X-User-Role / X-Trace-Id` 下游透传；**网关剥离客户端伪造的 `X-User-*` 头**。
+
+## 4. 数据一致性设计
+
+### 4.1 总体策略（同 v1）
+
+**不引入 Seata，全系统采用"本地消息表（事务性发件箱）+ RabbitMQ 最终一致 + 消费幂等"。** 否决 Seata AT：无跨服务强一致刚需（无资金类操作），TC 容器与全局锁调试成本对毕设性价比极低；排期冲突用"预检 + MySQL 唯一索引"兜底。
+
+### 4.2 通用可靠性件（每库一份模板表）
+
+- **local_message（发件箱）**：与业务同库同事务写入（INIT）→ 扫描器每 5s 投递（publisher confirms 确认）→ SENT→CONFIRMED；超时重投，指数退避 1/2/4/8/16 分钟，上限 5 次置 DEAD + 死信队列，管理后台补偿页人工重放；
+- **idempotent_consumption（消费幂等）**：唯一键 `(consumer_group, eventId)`，先插占位后执行；
+- 写接口一律支持 `Idempotency-Key` Header（Redis SETNX，10min）；
+- **MQ 故障降级**：MQ 不可用时 Outbox 暂存、恢复后补发，本地状态不回滚。
+
+### 4.3 典型场景
+
+① **Offer 确认 → 通知**：interview 本地事务同写 offer 表 + local_message，notify 以 offerId 幂等；② **简历上传 → 建档 → 解析任务**：事务性发件箱保证原子性，失败重试 ≤3 进死信，HR 可见并手动重试（幂等键 resumeId+attempt）；③ **面试结果提交 → 流转 + 通知 + 画像**：interview 单库事务完成状态机，跨服务挂 `interview.result.submitted`，消费方以 interviewId+轮次 幂等；④ **排期建房（v2 新增）**：interview 本地事务写排期（ROOM_PENDING）→ 事件 → room 建房并回执；失败重试，超阈值标记"房间待处理"，HR 可手动重试。
+
+### 4.4 排期冲突的强一致（v2 升级为三方校验）
+
+- **时间槽泛化建模**：`schedule_slot(participant_type, participant_id, slot_date, slot_no, interview_id)`，participant_type ∈ {INTERVIEWER, CANDIDATE, RESOURCE}（RESOURCE 预留线下会议室），30 分钟一格（slot_no 0~47），唯一索引 `(participant_type, participant_id, slot_date, slot_no)`；
+- 流程：预检接口同时校验面试官、候选人、资源三方重叠（`start < existing.end AND end > existing.start` 语义落入槽位查询）→ 单事务 insert interview + N×M 条 slot（全部参与者逐格插入）→ 任一格唯一索引冲突 → 整单回滚 → 返回 409 + 精确冲突明细（哪一方、哪一时段）；
+- 并发分析：两个 HR 同时为同一面试官/候选人排同一时段，唯一约束串行裁决，后者整单回滚；插入与预检同库同表，无跨服务竞态；
+- **时间粒度契约**：面试开始/结束时间必须对齐 30 分钟边界；若业务允许任意分钟，预检与写槽必须使用统一的取整规则（例如覆盖所有被触及的槽位），并在 API 契约中写清，否则会误判/漏判；需要缓冲时间就额外占用相邻槽位；
+- 取消面试：slot 行物理删除 + interview 软删（保证唯一索引完整性）。
+
+## 5. 技术选型说明
+
+### 5.1 选型总表（含被否决方案；★=v2 变更项）
+
+| 领域         | 选定（版本）                                                                                                                                      | 被否决方案                       | 否决理由                                                                                                           |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| JDK        | JDK 17 LTS                                                                                                                                  | JDK 21 + Boot 3.5           | SC Alibaba 与 Boot 3.2.x 兼容矩阵已锁定验证，毕设求稳；团队首周冒烟后可评估升级                                                            |
+| 基础框架       | Spring Boot 3.2.x                                                                                                                           | Spring Boot 2.7             | 2.7 已 EOL                                                                                                      |
+| 微服务套件      | Spring Cloud 2023.0.x + SC Alibaba 2023.0.1                                                                                                 | Dubbo 3                     | REST+Feign 生态熟悉度高，利于答辩讲解与调试                                                                                    |
+| 注册/配置中心    | Nacos 2.3.x（单机）                                                                                                                             | Eureka+Config / Consul      | 二合一省资源；Eureka 已进维护模式                                                                                           |
+| 网关         | Spring Cloud Gateway（WebFlux）                                                                                                               | Nginx 反代直连                  | 无法做 JWT 前置、动态发现路由与内部接口屏蔽                                                                                       |
+| RPC        | OpenFeign + Spring LoadBalancer                                                                                                             | gRPC                        | 调试可见性优先                                                                                                        |
+| MQ         | RabbitMQ 3.13（confirms + 延迟插件）                                                                                                              | RocketMQ / Kafka            | 资源最轻、运维最简；RocketMQ 运维重、Kafka 过度设计                                                                              |
+| 缓存         | Redis 7.2                                                                                                                                   | 本地 Caffeine                 | 分布式会话/限流/令牌轮换；Caffeine 仅可选二级                                                                                   |
+| 关系库        | MySQL 8.0                                                                                                                                   | PostgreSQL                  | 题目指定结构化 Markdown 存 MySQL                                                                                       |
+| 搜索与向量库     | Elasticsearch 8.13（dense_vector 512 维 + HNSW + ik，单分片 0 副本）                                                                                 | Milvus / pgvector           | 题目指定 ES 8.0 线；全文+向量一库两用                                                                                        |
+| Embedding  | bge-small-zh-v1.5（512 维，CPU <20ms/条）                                                                                                        | bge-base / 云端 API           | base CPU 推理慢 3 倍；云端有成本与隐私出域问题。**BGE-M3(1024 维)列为升级档**：评测不达标时经索引重建切换（emb_model 版本字段已预留）                         |
+| 简历解析       | MinerU（独立 Python worker 容器）                                                                                                                 | 云端解析 API                    | 题目指定技术路线                                                                                                       |
+| ★大模型接入     | **vLLM（Qwen2.5-7B-Instruct-AWQ）主推理引擎 · GPU 节点** → 云端 LLM（DeepSeek 主/通义备）备用 → Ollama(qwen3:1.7b) 无 GPU 档 → 静态模板，经 ai-service 收口；**Mock 档**用于开发/CI；无 GPU 时改 base-url 一键回退云主档 | 云端 LLM 为主（v2.x 口径）                  | 团队可获取 24GB GPU（评审基线 zyh/qyf 方案均为 vLLM 主线）：零 API 成本、参数与版本可控、可压测（max-num-seqs 24）、答辩可讲 guided decoding 结构化输出；云端/无 GPU/Mock 三级回退保留兜底。四类端点全部 OpenAI 兼容，openai SDK 统一切换 |
+| ★ASR       | **FunASR（Paraformer/SenseVoice 流式，ai-worker 内）首选**；faster-whisper 备选（会后文件转写）；云端 ASR 兜底                                                      | 抓取 LiveKit 混音轨转写（重复/回声、无法区分说话人） | 中文流式场景 FunASR 明显更强（流式+VAD+标点+热词）；音频来源=参会人本地麦克风 WSS 直推（每参会人一条流，1v5=6 路）；保留第 1 周 POC 门槛（CER ≤0.15）与并发压测（目标 ≥20 路，容量契约见 5.4），超限降级会后补转写                                          |
+| ★WebRTC 媒体 | **LiveKit SFU + Egress**（替换 v1 的 SRS）                                                                                                       | 见 5.2 专项论证                  | —                                                                                                              |
+| 对象存储       | MinIO 单节点（S3 兼容，Egress 原生支持）                                                                                                                | 云 OSS                       | 免费本地闭环、答辩不依赖外网                                                                                                 |
+| API 文档     | Springdoc OpenAPI 3                                                                                                                         | Swagger 2                   | Boot 3 兼容                                                                                                      |
+| 前端         | Vue 3.4 + TS + Vite + Pinia + Element Plus + livekit-client                                                                                 | React 18 + AntD             | 表单/表格密集场景 Element Plus 中文生态开箱即用                                                                                |
+| CI/CD      | GitHub Actions（构建在服务器侧执行）                                                                                                                   | Jenkins / Gitee Go / 纯脚本    | 见 6.4                                                                                                          |
+| 部署编排       | Docker Compose（base/app/gpu + profiles）                                                                                                   | Kubernetes                  | 学生团队单机/双节点足够，K8s 开销与成本不划算                                                                                  |
+| 链路追踪       | Micrometer Tracing + traceId 贯穿（HTTP/Feign/MQ/WS/Webhook）                                                                                   | SkyWalking / Tempo          | 多一个常驻容器只为演示级流量，traceId grep 即可拼链路                                                                              |
+| 日志         | logback JSON 按天轮转（7 天）                                                                                                                      | Loki                        | 多 300M 内存与 2 容器不值                                                                                              |
+| 前端形态       | **单 SPA + 后端动态菜单驱动路由**                                                                                                                      | admin+candidate 双前端         | 前端仅 1 名同学，双应用+共享包维护成本翻倍；动态菜单由 IAM 驱动已满足"按角色显示菜单"演示点                                                            |
+
+
+### 5.2 WebRTC 媒体方案专项论证（v2 修订）
+
+| 方案                          | 评估（三人团队前提）                                                                                                                                                                                                                                          |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 纯 P2P + TURN                | 否决：1v5 Mesh 上行爆炸；录制与 AI 转写拿不到媒体流                                                                                                                                                                                                                    |
+| **SRS（v1 选定）**              | **降为备选**：单容器极简、HTTP API 友好；但群面多参与者订阅模型支持弱、前端需自写 WHIP/WHEP 推拉流封装、无官方 Vue SDK——三人团队下"自写客户端"的边际成本高于 LiveKit 的运维成本                                                                                                                                      |
+| **LiveKit + Egress（v2 选定）** | **选定**：原生支持 1v5（Simulcast/SVC + 订阅管理）、官方 livekit-client JS SDK 极大降低前端工作量、Egress 房间合成录制原生输出到 S3 兼容存储（MinIO）、Java Server SDK 签发令牌与处理 Webhook、TURN/TCP 443 穿透兜底内置。代价：多一个 Go 组件（单机部署不需要 Redis）、概念学习成本约 2~3 天（第 1 周 spike 消化）；**若第 1 周 spike 失败可回退 SRS** |
+| Jitsi                       | 否决：组件爆炸（JVB/Jicofo/Prosody）                                                                                                                                                                                                                         |
+| 声网/腾讯云 SDK                  | 否决：计费与实名审核不可控、演示依赖外网、无法体现自研架构能力                                                                                                                                                                                                                     |
+
+**1v5 容量模型**：6 人群面中每人订阅其余 5 人视频，SFU 转发约 6×5=30 条订阅流；按每路 0.8Mbps（720p）估算，单房间下行转发量级约 24Mbps——群面默认采用 360p/540p、15~24fps 保守档（Simulcast 订阅低轨），面试官放大某候选人时再提升画质；同房间并发屏幕共享者限 1 人。上述 24Mbps 仅指 SFU 转发，**不含 Egress 录制**；每房间合成录制约 1.5~2.5Mbps，W14 压测单独计入。**演示容量目标**（写入验收，实测校准）：冒烟 2×1v1+1×1v5（10 分钟稳定）；基线 5×1v1+5×1v5（约 40 参与者）；扩展 10+10（约 80 参与者，达不到则如实报告实测瓶颈，不伪造通过）。
+
+### 5.3 AI 组件拓扑（v2 修订）
+
+```
+业务服务/前端
+  → ai-service（Python/FastAPI 编排：鉴权/配额/任务类型/Prompt 版本/超时漏斗/降级路由/审计/人工复核状态）
+      → 短任务：LLM 路由（**vLLM 主 · GPU 节点** → 云端 API 备 → Ollama 无 GPU 档 → 静态模板；Mock 档供开发/CI；全部 OpenAI 兼容，切档只改 base-url+model）
+      → 长任务：RabbitMQ → ai-worker（FunASR 流式 ASR / BGE Embedding）
+      → 重任务：RabbitMQ → mineru-worker（MinerU 解析，低频重任务独立容器）
+  → Schema 校验 → 规则/安全检查 → AI 草稿（带证据与置信度）→ 人工确认 → 写入正式业务状态
+```
+
+**纪要/评价草稿触发**：以 `room.finished` + 转写就绪为主；`recording.completed` 只用于录像资产登记与可选补转写。录制关闭、失败或候选人未同意录制时，仍可用实时转写文本生成草稿；两者都没有时，标记 `INSUFFICIENT_TRANSCRIPT`，提示人工填写，不阻塞面试结束。
+
+**worker 拆分理由**：MinerU 依赖 paddle/torch 全家桶（镜像 5GB+）且单任务 CPU 100%、30s+/份，与"高频轻推理 + 长驻 ASR 流"的 ai-worker 资源画像冲突；拆开后 MinerU OOM 不影响实时字幕。
+
+**Agent 开发统一规约（强制）**：每个 AI 能力必须登记——agentCode、负责人、版本、输入 DTO、输出 JSON Schema、模型与 Prompt 版本、最大执行时间与 token、重试策略、人工复核条件；明确区分原始事实/模型推断/待确认字段，产出附证据片段；简历与转写文本一律按不可信数据处理（防 Prompt Injection，定界符包裹）；淘汰、发 Offer、批量导出等有副作用动作必须服务端规则控制 + 人工确认；记录 traceId/taskId/prompt 版本/检索引用/工具名/校验结果/时延/错误码，日志脱敏。
+
+### 5.4 ASR 并发与字幕容量契约（v3.0）
+
+- **音频来源**：每位参会人浏览器本地麦克风采集，每人一条 16kHz PCM 流；1v5 群面 = 6 路，1v1 = 2 路；不抓 LiveKit 混音轨，避免回声与说话人混淆。
+- **单实例目标**：单个 ai-worker 实例目标 **≥20 路**并发流；多实例可水平扩展；实际上限以 W1 压测为准（CPU/GPU、VAD、热词、标点均计入）。
+- **容量与降级契约**：
+
+| 场景 | 音频流 | 实时字幕策略 |
+|---|---:|---|
+| 1×1v1 | 2 | 全量实时 |
+| 1×1v5 | 6 | 全量实时 |
+| 冒烟 2×1v1 + 1×1v5 | 10 | 全量实时 |
+| 基线 5×1v1 + 5×1v5 | 40 | **前 20 路实时**；其余 `ASR_OVERLOAD`，暂停实时字幕、会后补转写 |
+| 扩展 10×1v1 + 10×1v5 | 80 | 前 20 路实时；其余降级 |
+
+- **降级行为**：面试、聊天、录制、评价主流程不受影响；UI 显示「实时字幕暂停，会后自动补转写」；录制完成或转写完成后，AI 仍可生成纪要/评价草稿。
+- **扩容方式**：增加 ai-worker 实例或独立 ASR GPU；如果答辩要求基线 40 路全部实时字幕，必须按 40 路重新压测并扩容，不能沿用 20 路目标。
+- **验收口径**：冒烟场景（10 路）必须全量实时；基线场景只承诺 20 路实时，超出部分按降级契约判定，不伪造「全部实时」。
+
+## 6. 部署与容错策略
+
+### 6.1 环境规划（三环境）
+
+| 环境               | 用途     | AI/媒体策略                                           |
+| ---------------- | ------ | ------------------------------------------------- |
+| Local（各人开发机）     | 日常开发   | Compose 依赖件；LLM 用 Mock 档或团队共享 Key（本机无 GPU）；LiveKit 本机/内网测试 |
+| Integration（服务器） | 日常合并验证 | 固定测试数据、真实中间件、**vLLM GPU 节点**（或临时共享云 Key）与 LiveKit；**禁止真实候选人数据** |
+| Demo/Defense（答辩） | 演示     | 冻结版本与演示数据；vLLM 本地推理 + 预跑媒体检查与录制检查；GPU 故障切云 Key 演练；拔网线离线演练                     |
+
+密钥管理：环境差异进 Nacos 加密配置（Jasypt），密钥文件 chmod 600 不进 Git；LLM Key 轮换仅改 Nacos + refresh 热更；余额每日巡检 <¥30 邮件告警；`.env.example` 入库，真实 `.env` 禁止提交。
+
+### 6.2 容器编排（Docker Compose，v2 更新）
+
+- `base.yml`（中间件）：nacos → mysql(7 库) → redis → rabbitmq → es8.13(2g 堆,自构建含 ik) → minio，全配 healthcheck；
+- `app.yml`（业务）：nginx、gateway、7 个 Java 业务服务、ai-service（python:3.11-slim）、livekit、egress、ai-worker、mineru-worker、prometheus、grafana，`depends_on: condition: service_healthy`；**`gpu.yml`（vLLM）**：`vllm/vllm-openai` 镜像 `--gpus all`（Qwen2.5-7B-Instruct-AWQ、`--max-model-len 16384`、`--gpu-memory-utilization 0.82`、`--max-num-seqs 24`、`--enable-prefix-caching`、`--quantization awq`），部署于 GPU 节点，镜像 tag 与 CUDA/驱动版本提前锁定；
+- **profiles**：`gpu`（启 vLLM 主档，需 GPU 节点）、`with-es`（应急降级停 ES → Nacos `search.mode=mysql-like`）、`offline-ai`（断网档：有 GPU=vLLM 本地推理，无 GPU=Ollama）、`mock-llm`（开发/CI 无 GPU 无 Key 也能跑通 AI 链路）、`monitor`（资源紧张时摘除监控栈）；
+- 端口映射：仅 nginx 80/443 对公网；LiveKit 7880(WS/HTTP)、7881(TCP/TURN)、UDP 50000-50100（媒体，**直暴露给 LiveKit 节点、不经过 Nginx**）、5349(TURN TLS) 按答辩网络验证结果放行；LiveKit 信令建议**独立子域名**（`livekit.<domain>` → 7880 WSS），规避同域路径重写问题；vLLM 8000、FunASR 10095、ai-service 9010 一律内网；管理端口一律内网；
+- Java 镜像：多阶段构建 + layertools 分层，`-XX:MaxRAMPercentage=70`，healthcheck 90s start-period；Python 镜像（ai-service/ai-worker）：`python:3.11-slim` + requirements 锁版本，ai-service 无本地重模型、轻量常驻（约 300M）；
+- **硬件与内存预算（v3.0 双节点口径）**：**应用节点**（推荐 16C64G，最低单台 32GB RAM+24GB GPU 同机）承载全部中间件与业务服务——Java 7 服务各约 500~600M、ai-service 约 300M、中间件约 3.5G（ES 堆 2~4G）、LiveKit+Egress 约 700M、2 个 Python worker 约 1.7G、监控 500M，常态 RSS ≤14G（64G 机型宽裕；32G 最低配置摘监控栈并压低 ES 堆）；**GPU 节点**（24GB 显存）承载 vLLM（约 11G）+ FunASR（2~3G）+ MinerU 按需（3~4G，与 vLLM 错峰或走 CPU 档），显存预算约 19G 留 20% 余量，**禁止在同卡同时压满 LLM+MinerU+ASR**（显存抖动致 OOM）；**旧 4C8G 单机口径废除**（2C4G 停 ES→mysql-like 仅作应急档保留）。
+
+### 6.3 网络与安全
+
+- 单 bridge 网络，业务端口不映射宿主，仅 Nginx 暴露 80/443；防火墙仅放行 80/443/SSH 改端口 +（按验证结果）LiveKit UDP 段与 TURN 端口；
+- Nginx：静态 gzip+缓存、`/api → gateway`（read_timeout 40s 对齐 AI 漏斗）、**`/api/ai/v1/asr → ai-worker`（rewrite 到 `/ws/asr/{sessionId}`；ASR WSS 直达，Upgrade 头 + 3600s，不进 gateway）**、`/ws → room`（Upgrade 头 + 300s）、LiveKit 信令优先独立子域名 `livekit.<domain>`；若用同域 `/livekit → livekit:7880`（WSS；UDP 媒体段不经 Nginx），必须 rewrite `^/livekit/(.*)$ /$1`，因为 LiveKit 客户端请求 `/rtc`，否则会 404；`/swagger` 公网拒绝；
+- 安全基线：JWT（Access 2h + Refresh 7d，Redis 轮换 + `token_version` 撤销；**Refresh Token 建议 HttpOnly+Secure+SameSite Cookie，若走响应体则前端不落 localStorage 并配置 CSP**）、**RBAC 权限码三态（菜单/按钮/API）+ 数据范围**、候选人归属切面校验（防水平越权）、文件仅预签名 URL（10min）、手机号 AES-GCM+HMAC 盲索引、MinIO 桶私有、LiveKit Webhook 验签+幂等、BCrypt/Argon2 密码哈希、登录失败锁定；
+- **合规底线**：简历/录像/转写属敏感个人信息——最小权限、私有桶、短期签名链接、下载审计、保留期限（录像 90 天）；面试录制需候选人知情同意；AI 不推断年龄/性别/婚育等与岗位无关属性，AI 分数不作为唯一决策依据。
+
+### 6.4 CI/CD（GitHub Actions，v2 补充团队门禁）
+
+流水线：verify（前端 lint/typecheck/build + Java compile/Checkstyle + Python lint/tests + Flyway migration 验证）→ test（单测，核心模块覆盖率 ≥60% 门禁）→ build-image（ssh 服务器构建+push 阿里云 ACR 个人版）→ deploy-demo（main 触发 + 人工审批）。分支：`feat/<domain>-<short>` → main，**PR 至少一名非作者同学评审**；制品 tag `{service}:{yyyyMMdd}-{短hash}`，保留 3 版 + `demo-frozen` 冻结版。被否决：Jenkins（独占资源不划算）、Gitee Go（额度小排队不可控）、纯脚本（无门禁，保留为断网手动通道）。
+
+### 6.5 可观测性
+
+Actuator+Micrometer+Prometheus+Grafana；logback JSON 文件轮转；traceId 贯穿 HTTP/Feign/MQ/WS/Webhook。Grafana「答辩保障总览」指标：JVM/GC、MQ 堆积与 confirms 失败与死信数（>0 红灯）、解析任务积压与 MinerU 耗时、LLM 失败率与降级次数、**vLLM GPU 显存/利用率/KV Cache/排队/TTFT/tokens-per-sec（自带 /metrics）**、**LiveKit participants/packet loss/recording jobs**、**ASR 并发流数与 ASR_OVERLOAD 拒绝率**、WS 连接数、MySQL 慢查询。告警复用 notify 邮件通道；答辩前一周收紧阈值。
+
+### 6.6 三级容错与依赖降级矩阵
+
+- 服务级：Sentinel（网关全局 QPS 200/单 IP 50/登录 100；AI 链路异常比例 >50%（10s 窗口）熔断 5 分钟自动**切云端 LLM 备档**（vLLM 不可用时），云端也不可用再切 Ollama/模板；核心接口慢调用 RT>800ms 比例 >60% 熔断 30s）；Feign 超时漏斗；
+- 容器级：restart:always + healthcheck 自动拉起；MaxRAMPercentage 自适应缩堆；
+- 数据级：MQ confirms+持久化+死信 SOP；MySQL 每日 03:00 mysqldump（保留 7 份）+ MinIO mc mirror 备份盘；备份恢复演练 <10 分钟；
+- **依赖降级矩阵**：AI 服务挂 → 面试/排期/评价继续，AI 任务排队标"待生成"；LLM 过载 → 限流+排队+降级；ASR 挂 → 面试继续、会后补转写；LiveKit 异常 → 客户端重连/切音频重进；Egress 失败 → 标记录制未完成、可重试，**不阻塞面试结束**；ES 挂 → Nacos 切 mysql-like；MQ 挂 → Outbox 暂存恢复补发。
+
+### 6.7 发布与回滚
+
+一键部署 `./deploy.sh <service>` / 一键回滚 `./rollback.sh <service> <tag>`（单服务粒度，目标 1 分钟回滚，回滚后 smoke.sh 验证）；Flyway 只向前、代码兼容旧 schema；T-3 冻结 main + `demo-frozen` tag + `docker save` 镜像 tar 离线兜底。
+
+### 6.8 演示日 Runbook（三人各演一条主线）
+
+- **T-7**：教室网络 POC（LiveKit UDP/TURN/手机热点跨网、投影）→ 全链路冒烟 → 基线压测 → 备份恢复演练 → 告警邮件实测；
+- **T-1**：全量镜像 + **vLLM 模型本地化（含 CUDA 驱动与镜像 tar）** → **拔网线演练** → seed 演示数据 → 预解析 3 份简历 → smoke.sh 全绿 → 打快照；
+- **现场分工**：BE-B 演示智能简历主线（拍照简历上传→解析→AI 排序→去重合并），BE-A 演示面试管理主线（建岗→排期三方冲突拦截→通知→评价流转→Offer），FE 演示在线面试主线（双屏+三 profile：1v1→1v5 群面→屏幕共享→字幕→录制回放→纪要复核）；一人主讲时另两人操作与盯 Grafana 面板；
+- **故障应急表**：LiveKit 起不来→90s 排障→切录屏视频；ES 挂→Nacos 切 mysql-like（30s 生效）；vLLM 异常/超时→确认自动熔断切云端 LLM（"优雅降级本身是设计亮点"）；ASR 过载→字幕暂停+会后补转写；**故障注入演示点**：现场停掉 ai-worker，展示"主业务不受影响、任务排队、恢复后自动消化"——把可靠性设计变成演示环节；服务器失联→本地笔记本离线包演示。
+
+## 7. 里程碑与排期（三人 16 周，按能力分工）
+
+> 人力假设：3 名学生，每人每周有效开发 15~20 小时；**高风险技术验证全部前置到第 1 周**；每人主责一个子系统域作为论文主线。BE-A=面试与平台（gateway/auth/interview/room，兼集成负责人），BE-B=人才与 AI（resume/ai-service/file/notify + ai-worker/mineru-worker 共 3 个 Python 工程，兼部署负责人），FE=前端与演示（兼房间前端）。**v3.0 已将 notify 移交 BE-B** 平衡工作量。
+
+| 周次    | 主题                  | BE-A                                        | BE-B                                                 | FE                                  | 阶段验收（必须可展示）                                 |
+| ----- | ------------------- | ------------------------------------------- | ---------------------------------------------------- | ----------------------------------- | ------------------------------------------- |
+| W1    | 需求冻结 + **四大 spike** | LiveKit 2 人/6 人通话+录制 spike；仓库/CI/Compose 骨架 | **vLLM(GPU) 启动与 guided JSON 冒烟 + FunASR 并发压测**；MinerU 样例解析；ES KNN 冒烟                | 配合 LiveKit 前端 spike；Vue 工程初始化       | 四 spike 结果与设备/版本记录；依赖一键启动；ADR 一页；1v5 人数口径确认 |
+| W2    | IAM 与工程骨架           | auth（iam\_* 表/JWT/动态菜单 API/数据范围）+ gateway 路由/验签骨架（Owner） | recruit-common/api 模块、CI/traceId 公共件；配合 gateway 限流/错误码 | 登录页、动态路由菜单框架、axios 封装（401 刷新队列）     | 五角色登录；管理员勾选角色菜单即时生效；越权 API 403 用例通过         |
+| W3~4  | 简历域链路               | 岗位/申请/流程模板骨架 + 权限联调              | file-service（预签名/MIME 校验/分片）+ resume 上传/解析任务/MinerU worker/分块/embedding/ES 索引与混合检索 | 上传页+解析状态轮询+检索列表页                    | 三类样例（正常/失败/表格）解析→入库→检索命中；未授权访问文件被拒；失败任务可重试  |
+| W5~6  | 面试域闭环               | 流程模板/状态机/排期三方冲突/评价（模板版本化）/流转/Offer          | notify（邮件+站内信）；本地消息表+幂等件通用化                          | 岗位配置/状态机看板/排期日历/评价表单                | 申请→一面→评价→下一阶段待办走通；并发排期冲突拦截（三方）；通知 60s 内达    |
+| W7~8  | 在线面试核心              | room 状态机/LiveKit 令牌/名额校验/Webhook（验签+幂等）     | ai-worker FunASR 字幕链路（浏览器麦克风 WSS→转写→WS 推送）                  | 房间页（1v1+1v5 网格布局/聊天/屏幕共享/断线重连/进房预检） | 2 人与 6 人房间稳定通话 10 分钟；未邀请者被拒；超员被拒；字幕 ≤5s 出字（按 5.4 容量契约；超出 20 路降级不算失败）  |
+| W9~10 | 会后链路 + AI 收口        | Egress 录制编排/回放权限/纪要回写 interview             | ai-service 编排收口（匹配双路/纪要/评价草稿/Prompt 版本/审计/降级链）       | 回放页/纪要人工确认界面/匹配排序视图（评分理由+证据片段）      | 录制可回放且鉴权；纪要可回溯转写片段；AI 故障不影响主流程；Top5 命中率初测   |
+| W11   | 异步录播面试（Must 全绿后启动）  | 回看打分后端                                      | 逐题 ASR+AI 评分编排                                       | 作答页（倒计时/录像上传/失败续传）                  | 出题→录像作答→回看打分闭环                              |
+| W12   | 查重与人才库深化            | Offer 简化审批流                                 | 向量去重/合并审核/人才跟进提醒（延迟消息）                               | 查重提示/合并确认/人才库检索页                    | 同人 3 份简历合并 1 档案；高相似异人不误合并                   |
+| W13   | AI 评测实验             | 配合标注集准备                                     | 评测集构建/指标计算/消融对比（随机/时间序/纯向量/双路）                       | 对比图表页（命中率/NDCG 曲线）                  | 实体抽取 F1、Top5 命中率、NDCG、ASR CER、纪要覆盖率数据报告     |
+| W14   | 压测与故障注入             | WebRTC 基线压测（5+5 房间）组织                       | API 压测/MQ 堆积与重试/故障注入（停 worker/ES/LLM）                | 真实浏览器多端压测配合；权限与 Prompt Injection 测试 | 容量报告（P95/错误率/带宽/瓶颈）；降级验证全部通过                |
+| W15   | 演示数据与演练             | 演示 seed/脚本                                  | 离线包与备份恢复演练                                           | 演示脚本排练/runbook 执行                   | 干净环境按 README 一键启动；拔网线演练通过                   |
+| W16   | 冻结与答辩               | 缺陷修复                                        | 缺陷修复                                                 | 彩排                                  | demo-frozen tag；三人各自演示脚本定稿                  |
+
+**关键路径**：W1 spike（失败即触发备选：LiveKit 不通→TURN 配置/回退 SRS；云 LLM 不可行→Ollama 全量）→ W3~~4 简历管线 → W7~~8 在线面试 → W13 评测数据。**缓冲策略**：W11 录播与 W12 深化互为缓冲——任一延期则压缩另一项，Must 层不动。
+
+## 8. 团队协作契约（全员必须遵守）
+
+1. **代码 Owner 唯一**：每个服务/前端域有唯一明确 Owner（见 2.3 表）；BE-A 兼任集成负责人，BE-B 兼任部署负责人，FE 兼任演示负责人。
+2. **契约先行**：新增/变更跨服务 API 先改 OpenAPI 文件再写代码；新增事件先登记到《开发文档》事件清单；事件字段只增不改；破坏性变更版本化。
+3. **数据所有权**：只能写自己服务的 schema；需要他人数据时加 ID+快照+事件，禁止跨库 JOIN 与跨库写。
+4. **权限码登记**：新增接口必须登记权限码（菜单/按钮/API 三态一致），由 auth-service 统一 seed；前端隐藏按钮不是安全边界。
+5. **AI 纪律**：不允许绕过 ai-service 直连模型；AI 输出一律草稿+人工确认；Prompt 与模型版本变更进 PR，固定评测集回归。
+6. **分支纪律**：`main` 保持可运行可演示；`feat/<domain>-<short>` 短分支 + PR（至少一名非作者评审）；**每周五合并出可演示版本并打 tag**；CI 门禁必绿。
+7. **统一纪律**：雪花 ID 字符串化（前端用 string）；时间 UTC 存储、ISO 8601 输出；枚举 VARCHAR 存代码不用 MySQL ENUM；状态流转必须服务端显式状态机校验（不允许 Controller 任意写 status 字符串）；关键状态表加 version 乐观锁。
+8. **Definition of Done（每功能）**：契约与文档已更新、权限已落实、错误路径与超时已处理、日志带 traceId、至少一个单测+一个关键集成测试、UI 有加载/空态/失败/重试四态、无硬编码 URL 与密钥、`.env.example` 已更新、PR 评审通过。
+9. **数据红线**：不提交 `.env`、模型权重、真实个人信息、录像文件、访问密钥；开发测试一律用虚构数据。
+
+## 9. 风险清单与应对（v2.0 / v3.0）
+
+| 风险                     | 概率 | 影响 | 应对                                                                      |
+| ---------------------- | -- | -- | ----------------------------------------------------------------------- |
+| LiveKit 跨校园网/NAT 连接失败  | 中  | 高  | 第 1 周 spike 验证 HTTPS/UDP/TURN/手机热点；LiveKit 内置 TURN/TCP 443 兜底；不要只测本机局域网 |
+| 三人协作失控（进度漂移/接口脱节/集成爆炸） | 中  | 高  | 第 8 章协作契约：契约先行、周五集成 tag、CI 门禁、Owner 唯一；每周站会同步阻塞                         |
+| 1v5 群面带宽/性能不达预期        | 中  | 中  | Simulcast 保守档（360p/540p）；容量模型先行估算；W14 真实客户端压测，达不到扩展目标则如实报告瓶颈（不伪造）       |
+| FunASR 中文流式效果不达预期      | 中  | 中  | 第 1 周 POC（CER ≤0.15 门槛）；不达标切云端 ASR 或降为会后转写（faster-whisper 文件转写保底）       |
+| MinerU 依赖安装复杂/镜像 5GB+  | 高  | 中  | 独立容器不污染 Java 环境；固定 Python 版本与依赖锁；镜像提前拉取并导出 tar                          |
+| 云端 LLM 限流/断服/超预算       | 低  | 低  | vLLM 本地主档后云端仅为备用；双厂商 + Ollama + 模板降级；额度熔断（预算 80% 切本地）；余额巡检告警                          |
+| GPU 节点不可用（驱动/显存不足/vLLM 起不来） | 中  | 高  | W1 spike 验证 vLLM 启动与并发；云端 LLM 备档一键切换（改 base-url）；Mock 档兜底演示；显存隔离（vLLM 与 MinerU/ASR 错峰或 CPU 档）      |
+| 应用节点 32G 最低配置内存紧张    | 低  | 中  | 降级开关（摘监控栈、压低 ES 堆）；推荐 64G 应用节点；答辩前全链路冒烟                                     |
+| 答辩现场断外网                | 中  | 低  | vLLM 本地推理不依赖外网；T-1 拔网线演练；Ollama/Mock 档+本地镜像 tar；录屏兜底                                   |
+| 成员临时掉线（生病/实习冲突）        | 中  | 中  | Owner 制 + 周五集成使知识始终合入主干；高风险技术（LiveKit/AI）spike 记录双人会签                   |
+| 短信通道个人无资质              | 高  | 低  | 邮件+站内信闭环，短信 Mock                                                        |
+| AI 幻觉/评分偏差引发质疑         | 中  | 低  | 输出带证据+人工确认+版本可追踪；答辩话术"AI 只做草稿"；固定评测集回归                                  |
+
+## 10. 决策与权衡说明
+
+### 10.1 裁决记录（v2.0 / v3.0）
+
+1. **媒体面 SRS → LiveKit + Egress**：三人团队承载得起 LiveKit 运维，换取官方 SDK、原生 1v5、Egress 录制与 TURN 穿透；SRS 降为备选（第 1 周 spike 失败可回退）。
+2. **群面 1v5：Won't → Must**：题目原文含"单人/群面"，LiveKit 下边际成本低；容量口径定义为"1 面试官+最多 5 候选人=6 人"（第 1 周需求评审确认）。
+3. **屏幕共享：Should → Must**：LiveKit SDK 原生支持，成本近乎为零。
+4. **auth-service → 完整 IAM**：升级动态菜单/权限码/数据范围（iam\_* 表），"管理员勾选角色菜单"是题目平台治理演示点；不拆分独立 system 服务（服务边界不变）。
+5. **LLM 路线（v3.0 修订：vLLM 升主线）**：~~云端 LLM 主 + Ollama 兜底 + Mock 开发档；vLLM 仅作增强档~~ → **v3.0 起 vLLM（Qwen2.5-7B-Instruct-AWQ，24GB GPU）为主推理引擎，云端 LLM（DeepSeek 主/通义备）降为备用，Ollama 仅作无 GPU 档，Mock 供开发/CI**。依据：团队可获取 24GB GPU，且评审基线（详细设计）均以 vLLM 为主线——本地推理零 API 成本、参数与版本可控、可压测（max-num-seqs 24）、答辩可讲 guided decoding 结构化输出；原"GPU 硬依赖风险"由双节点部署 + 三级回退（云→Ollama→模板）+ 一键切档消解。
+6. **ASR：faster-whisper → FunASR 首选**（中文流式+VAD+标点+热词）；faster-whisper 降为会后文件转写备选；云端 ASR 兜底；保留 CER ≤0.15 POC 门槛。
+7. **前端保持单 SPA**：否决双前端（前端仅 1 人，双应用+共享包维护成本翻倍）；动态菜单由 IAM 驱动路由。
+8. **排期冲突升级三方校验**：候选人/面试官/资源统一进 schedule_slot 泛化模型（v1 只校验面试官维度）。
+9. **事件治理升级**：事件信封规范（eventId/eventVersion/aggregateId/traceId）+ Schema 版本化 + publisher confirms。
+10. **一跳 Feign 原则 + `/internal/**` 网关屏蔽**。
+11. **（v2.1）ai-service 编排层语言：Java → Python/FastAPI**：大模型调用与编排归 Python——openai SDK 对 DeepSeek/通义/Ollama/vLLM 四类 OpenAI 兼容端点同构支持（换供应商只改 base-url+model），流式/重试/JSON Schema 生态成熟，且与 ai-worker/mineru-worker 同技术面，AI 侧三个工程收敛到 BE-B 一人；Java 业务侧经 OpenAPI 契约 Feign 调用（跨语言 REST，消费方无感知）。否决 Spring AI/Java 版 ai-service——LLM 生态 Python 优先，Java 侧实现无收益。
+12. **（v3.0）硬件预算升级**：旧 4C8G 单机口径废除。推荐应用节点 16C64G + GPU 节点（24GB 显存）双机；最低演示配置单台 32GB RAM + 24GB GPU。依据详细设计部署口径（`04-detailed-design/06-deployment-plan.md`：ES 4G 堆 + Java 4~6G + 中间件 + Egress 在 8G 内放不下）。
+13. **（v3.0）ASR 音频来源与并发模型**：字幕音频 = 参会人浏览器本地麦克风采集（16kHz PCM 经 WSS 直达 ai-worker，room-service 签发 `scope=asr` 短时令牌），每参会人一条流（1v5=6 路），**不抓 LiveKit 混音轨**（重复/回声、无法区分说话人）；FunASR 单实例目标 ≥20 路（W1 压测校准），超限 `ASR_OVERLOAD` 降级为"暂停实时字幕 + 会后离线补转写"，面试不阻断。
+14. **（v3.0）团队分工再平衡**：notify-service 移交 BE-B（其 W5~6 排期本就承担通知实现）；BE-A 收敛为 4 服务 + 集成；消除"BE-A 5 服务 + 集成"的偏重。
+15. **（v3.0）LiveKit 与 ASR 接入路径**：信令 WSS 走独立子域名（或 `/livekit` 同域代理），UDP 50000-50100 直暴露给 LiveKit 节点不经过 Nginx，TURN/TCP 443 兜底；ASR WSS 由 Nginx 直达 ai-worker 不进网关，令牌由 AI 侧校验。
+16. **（v3.0）细节同步开发文档**：ES mapping/RRF 检索、current_count 扣减与 Webhook 归还闭环、schedule_slot 唯一索引兜底（不依赖先查后插）、Refresh Token Redis Key 契约（refresh/family/blacklist/token_version）。
+17. **（v3.0）ASR 容量契约**：单 ai-worker 实例目标 ≥20 路；1v5=6 路、1v1=2 路；基线 40 路时只保证前 20 路实时字幕，超出部分 `ASR_OVERLOAD` 暂停实时字幕并会后补转写，面试/录制不阻断；需要全量实时则扩容并重测（见 5.4）。
+18. **（v3.0）纪要触发与面试笔记**：纪要/评价草稿由 `room.finished` + 转写就绪触发，录像仅作可选输入；新增 `interview_note` 人工笔记，AI 纪要只作补充，不替代人工记录。
+
+### 10.2 v1 裁决保留
+
+录制走服务端（Egress）、白板 Won't、异步录播 Should-High（设计全覆盖、Must 全绿后启动）、通知=邮件+站内信（短信 Mock）、实时字幕 Must、纪要 Should 最高优先（答辩亮点）、不引入 Seata、RabbitMQ 否决 RocketMQ/Kafka、Docker Compose 否决 K8s、轻量可观测否决 SkyWalking/Loki、本地消息表+幂等+死信+补偿页一致性方案（Ollama 与 ES 互斥仅适用于旧 8G 应急档，v3.0 主档本地推理由 vLLM 承担，断外网不影响演示）。
+
+### 10.3 主要被否决方案一览
+
+云端 LLM 作主档（v3.0 起降为备用；回退档保留）、"无 GPU 依赖"作为默认 AI 前提（v3.0 修订：GPU 已落实，vLLM 主）、Java/Spring AI 版 ai-service（改 Python/FastAPI + openai SDK）、SRS（降为备选）、P2P+TURN、Jitsi、声网/腾讯云 SDK、双前端 SPA、faster-whisper 实时首选、JDK 21+Boot 3.5（兼容矩阵未锁定验证）、Dubbo、RocketMQ/Kafka、Seata、Milvus/pgvector、bge-base/云端 Embedding（默认档）、K8s、SkyWalking/Loki、独立 system-service（并入 auth 的 IAM）、抓取 LiveKit 混音轨做转写，以及功能裁剪项（人脸核验/虚拟背景美颜/复杂白板/爬取/短信/外部日历/多租户——接口与埋点预留）。
+
+## 11. 待确认事项（【待确认】汇总）
+
+1. 答辩教室网络：UDP 放行/能否同网段/是否强制 HTTPS——第 1 周 LiveKit spike 验证（含手机热点跨网测试）；
+2. "1 对 5"人数口径：当前按"1 面试官+5 候选人=6 人"设计，若题目定义为总 5 人需在第 1 周需求评审调整配置；
+3. FunASR 中文 CER POC 结果（第 1 周，门槛 ≤0.15）；
+4. 异步录播面试是否硬性考点、Offer 审批流是否考点（影响 W11/W12 优先级置换）；
+5. GPU 节点落实与规格（vLLM 主档前提：24GB 显存 + CUDA 驱动兼容；若最终未落实，改 base-url 切云 LLM 主档，链路其余不变）；
+6. 备份盘选型（数据盘 vs 对象存储异地）；
+7. ASR 单实例 20 路容量与基线 40 路降级策略需 W1 压测确认；若要求基线全量实时字幕，需增加 ai-worker 实例/GPU 并重测；
+8. v3.0 开发文档的详细 DDL/API 需与架构同步（当前为契约版，详细设计参考 `04-detailed-design/`；W1 统一表名映射与字段契约）。
