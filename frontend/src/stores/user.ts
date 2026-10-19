@@ -18,6 +18,12 @@ export const useUserStore = defineStore('user', {
   }),
   actions: {
     // TODO(W2)：POST /api/auth/login → 存双令牌 → GET /api/auth/menus → 动态注册路由
+    hasRole(role: string): boolean {
+      return this.roles.includes(role)
+    },
+    hasAnyRole(roles: string[]): boolean {
+      return roles.some((role) => this.roles.includes(role))
+    },
     hasPermission(code: string): boolean {
       return this.permissions.includes(code)
     },
