@@ -28,7 +28,10 @@ services:
     build: { context: ../ai/ai-worker, dockerfile: Dockerfile }
     container_name: recruit-funasr
     profiles: ["gpu"]
-    ports: ["10095:10095"]
+    # 与 ai-worker/app/main.py、开发文档、Nginx、前端统一为 8001（不再使用 10095）
+    ports: ["8001:8001"]
+    environment:
+      ASR_MOCK: ${ASR_MOCK:-true}
     deploy:
       resources:
         reservations:
@@ -42,6 +45,8 @@ services:
     container_name: recruit-mineru
     profiles: ["gpu"]
     ports: ["8002:8002"]
+    environment:
+      MINERU_MOCK: ${MINERU_MOCK:-true}
     # 显存错峰：按需启动（低频重任务），与 vLLM/FunASR 错开
 
 volumes:
