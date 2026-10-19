@@ -42,3 +42,13 @@ services:
     build: { context: ../frontend, dockerfile: Dockerfile }
     container_name: recruit-frontend
     ports: ["80:80"]
+
+  # 入口 Nginx（生产占 80，frontend 退为内部；本地演示 nginx 占 8088 避免冲突）
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: recruit-nginx
+    ports: ["8088:80"]
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

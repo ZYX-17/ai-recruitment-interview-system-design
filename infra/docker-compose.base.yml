@@ -103,6 +103,21 @@ services:
     command: --dev --bind 0.0.0.0
     # TODO(W1 spike)：生产改用 config.yaml（TURN/TCP 443 兜底、keys 环境变量注入）
 
+  egress:
+    image: livekit/egress:v1.8
+    container_name: recruit-egress
+    profiles: ["with-egress"]   # 默认不启；W1 spike 通过后常开：--profile with-egress
+    restart: unless-stopped
+    environment:
+      EGRESS_CONFIG_FILE: /etc/livekit/egress.yaml
+    ports:
+      - "9090:9090"            # egress RPC/排障
+    volumes:
+      - ./egress/egress.yaml:/etc/livekit/egress.yaml:ro
+      - egress-data:/home/egress/media
+    # TODO(W1 spike)：编写 egress/egress.yaml（redis 指向 base 的 redis、api-key/secret、
+    #   S3 直写 MinIO recruit/recordings/ 房间合成录制 → MP4）
+
 volumes:
   mysql-data:
   redis-data:
@@ -110,3 +125,4 @@ volumes:
   nacos-data:
   minio-data:
   es-data:
+  egress-data:
