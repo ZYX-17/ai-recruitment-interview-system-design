@@ -1,0 +1,81 @@
+name: recruit-ai
+# AI 服务（B）：ai-service + ai-worker + mineru-worker
+# 用法：docker compose -f infra/docker-compose.ai.yml up -d
+# 说明：
+#   - 默认通过 host.docker.internal 访问宿主机上的 MySQL/Redis/vLLM；
+#   - 如与 base/app 处于同一网络，可将 MYSQL_HOST 等改为服务名并接入外部网络；
+#   - ai-worker / mineru-worker 默认 mock 模式，GPU 真实推理需先补 requirements 再重建。
+services:
+  ai-service:
+    build: { context: ../ai/ai-service, dockerfile: Dockerfile }
+    container_name: recruit-ai-service
+    restart: unless-stopped
+    ports: ["9010:9010"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      APP_NAME: ai-service
+      PORT: "9010"
+      MYSQL_HOST: ${MYSQL_HOST:-host.docker.internal}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_USER: ${MYSQL_USER:-root}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-root}
+      MYSQL_DB: ${MYSQL_DB:-recruit_ai}
+      REDIS_HOST: ${REDIS_HOST:-host.docker.internal}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      VLLM_BASE_URL: ${VLLM_BASE_URL:-http://host.docker.internal:8000/v1}
+      VLLM_MODEL: ${VLLM_MODEL:-Qwen2.5-7B-Instruct-AWQ}
+      CLOUD_BASE_URL: ${CLOUD_BASE_URL:-https://api.deepseek.com/v1}
+      CLOUD_API_KEY: ${CLOUD_API_KEY:-}
+      CLOUD_MODEL: ${CLOUD_MODEL:-deepseek-chat}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434/v1}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:1.7b}
+      AI_WORKER_URL: ${AI_WORKER_URL:-http://ai-worker:8001}
+      MINERU_WORKER_URL: ${MINERU_WORKER_URL:-http://mineru-worker:8002}
+    depends_on:
+      ai-worker:
+        condition: service_healthy
+      mineru-worker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:9010/health')\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks: [recruit-ai]
+
+  ai-worker:
+    build: { context: ../ai/ai-worker, dockerfile: Dockerfile }
+    container_name: recruit-ai-worker
+    restart: unless-stopped
+    ports: ["8001:8001"]
+    environment:
+      ASR_MOCK: ${ASR_MOCK:-true}
+      EMBED_MODE: ${EMBED_MODE:-mock}
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health')\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks: [recruit-ai]
+
+  mineru-worker:
+    build: { context: ../ai/mineru-worker, dockerfile: Dockerfile }
+    container_name: recruit-mineru-worker
+    restart: unless-stopped
+    ports: ["8002:8002"]
+    environment:
+      MINERU_MOCK: ${MINERU_MOCK:-true}
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health')\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks: [recruit-ai]
+
+networks:
+  recruit-ai:
+    driver: bridge
