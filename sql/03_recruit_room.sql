@@ -21,13 +21,15 @@ CREATE TABLE room (
   max_participants  TINYINT      NOT NULL DEFAULT 6,  -- ONE_TO_ONE=2 / ONE_TO_MANY=6
   current_count     TINYINT      NOT NULL DEFAULT 0,  -- 行级原子扣减，participant_left 归还（GREATEST 防负）
   recording_status  VARCHAR(16)  NOT NULL DEFAULT 'NONE', -- NONE/RECORDING/COMPLETED/FAILED（列表快照）
+  open_at           DATETIME(3)  NULL,               -- 进房开放时间（早到拒绝 ROM4003）
+  end_at            DATETIME(3)  NULL,               -- 房间最迟关闭时间
   created_at        DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at        DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   version           INT          NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   UNIQUE KEY uk_room_no (room_no),
   UNIQUE KEY uk_livekit_room (livekit_room_name),
-  KEY idx_interview (interview_id),
+  UNIQUE KEY uk_interview (interview_id),               -- 一场面试一个房间（重排期产生新 interview 记录）
   KEY idx_status (status)
 ) COMMENT='房间表（interview.scheduled 事件驱动创建）';
 
@@ -37,9 +39,11 @@ CREATE TABLE room (
 CREATE TABLE room_participant (
   id           BIGINT UNSIGNED NOT NULL,
   room_id      BIGINT UNSIGNED NOT NULL,
-  ref_id       BIGINT UNSIGNED NOT NULL,             -- iam_user.id
+  ref_id       BIGINT UNSIGNED NOT NULL,             -- iam_user.id（参会人登录身份）
+  person_id    BIGINT UNSIGNED NULL,                -- resume 库候选人档案（可空：面试官/观察员无 person）
   ref_name     VARCHAR(64)   NOT NULL,               -- 姓名快照
   role         VARCHAR(16)   NOT NULL,               -- HOST/INTERVIEWER/CANDIDATE/OBSERVER
+  consent_recorded TINYINT(1) NOT NULL DEFAULT 0,    -- 录制知情同意（进房勾选，防作弊/合规留痕）
   status       VARCHAR(16)   NOT NULL DEFAULT 'WAITING', -- WAITING/ADMITTED/JOINED/LEFT/KICKED
   livekit_identity VARCHAR(128) NULL,                -- 令牌绑定的 identity
   joined_at    DATETIME(3)   NULL,

@@ -50,6 +50,8 @@ public final class EventTypes {
     public static final String OFFER_CONFIRMED = "offer.confirmed";
 
     // 在线面试（room 域）
+    public static final String ROOM_CREATED = "room.created";                 // 建房回执（interview 回填 room_id）
+    public static final String ROOM_CREATE_FAILED = "room.create.failed";     // 建房失败（重试或人工处理）
     public static final String ROOM_FINISHED = "room.finished";               // 触发纪要（主触发）
     public static final String RECORDING_COMPLETED = "recording.completed";   // 录像登记/可选补转写
 
