@@ -1,0 +1,48 @@
+name: recruit-gpu
+# GPU 节点（24GB 显存）：vLLM 主推理 + FunASR + MinerU，显存错峰防 OOM
+# 用法：docker compose -f infra/docker-compose.gpu.yml --profile gpu up -d
+services:
+  vllm:
+    image: vllm/vllm-openai:v0.4.2
+    container_name: recruit-vllm
+    profiles: ["gpu"]
+    restart: unless-stopped
+    ports: ["8000:8000"]
+    volumes:
+      - vllm-models:/root/.cache/huggingface
+    environment:
+      HF_MODEL: Qwen/Qwen2.5-7B-Instruct-AWQ
+    command: >
+      --model Qwen/Qwen2.5-7B-Instruct-AWQ
+      --max-model-len 16384 --gpu-memory-utilization 0.82
+      --max-num-seqs 24 --enable-prefix-caching
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  funasr:
+    build: { context: ../ai/ai-worker, dockerfile: Dockerfile }
+    container_name: recruit-funasr
+    profiles: ["gpu"]
+    ports: ["10095:10095"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  mineru:
+    build: { context: ../ai/mineru-worker, dockerfile: Dockerfile }
+    container_name: recruit-mineru
+    profiles: ["gpu"]
+    ports: ["8002:8002"]
+    # 显存错峰：按需启动（低频重任务），与 vLLM/FunASR 错开
+
+volumes:
+  vllm-models:

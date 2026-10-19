@@ -1,0 +1,44 @@
+name: recruit-app
+# 应用层（7 个 Java 服务 + 前端）。用法：docker compose -f infra/docker-compose.base.yml -f infra/docker-compose.app.yml up -d
+services:
+  api-gateway:
+    build: { context: ../backend, dockerfile: Dockerfile, args: { MODULE: api-gateway } }
+    container_name: recruit-gateway
+    ports: ["8080:8080"]
+    environment: [ "NACOS_ADDR=host.docker.internal:8848" ]
+    depends_on: [ ]
+
+  auth-service:
+    build: { context: ../backend, dockerfile: Dockerfile, args: { MODULE: auth-service } }
+    container_name: recruit-auth
+    ports: ["8081:8081"]
+
+  interview-service:
+    build: { context: ../backend, dockerfile: Dockerfile, args: { MODULE: interview-service } }
+    container_name: recruit-interview
+    ports: ["8083:8083"]
+
+  resume-service:
+    build: { context: ../backend, dockerfile: Dockerfile, args: { MODULE: resume-service } }
+    container_name: recruit-resume
+    ports: ["8084:8084"]
+
+  room-service:
+    build: { context: ../backend, dockerfile: Dockerfile, args: { MODULE: room-service } }
+    container_name: recruit-room
+    ports: ["8085:8085"]
+
+  notify-service:
+    build: { context: ../backend, dockerfile: Dockerfile, args: { MODULE: notify-service } }
+    container_name: recruit-notify
+    ports: ["8086:8086"]
+
+  file-service:
+    build: { context: ../backend, dockerfile: Dockerfile, args: { MODULE: file-service } }
+    container_name: recruit-file
+    ports: ["8087:8087"]
+
+  frontend:
+    build: { context: ../frontend, dockerfile: Dockerfile }
+    container_name: recruit-frontend
+    ports: ["80:80"]

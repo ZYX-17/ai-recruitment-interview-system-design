@@ -1,0 +1,13 @@
+# ai-service · AI 能力编排（Python/FastAPI，Owner：B，库 recruit_ai）
+# LLM 路由（vLLM 主 → 云端备 → Ollama → 模板）、Prompt 版本、实体抽取、匹配精排、纪要、审计
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+openai==1.30.0              # 四类 OpenAI 兼容端点同构（vLLM/DeepSeek/通义/Ollama，换 base-url 即换档）
+pydantic==2.7.0
+pydantic-settings==2.2.1
+sqlalchemy==2.0.29
+pymysql==1.1.0
+redis==5.0.4
+httpx==0.27.0
+pyjwt==2.8.0                # 校验 room 签发的 scope=asr 短时令牌
+python-dotenv==1.0.1

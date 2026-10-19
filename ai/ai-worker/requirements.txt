@@ -1,0 +1,13 @@
+# ai-worker · 推理 worker（FunASR 流式 ASR + BGE Embedding，无状态高频轻推理，端口 8001）
+# 注意：funasr/torch 为重依赖，GPU 节点镜像内安装；本地无 GPU 开发可用 mock（见 app/main.py ASR_MOCK）
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+websockets==12.0
+numpy==1.26.4
+pydantic==2.7.0
+pydantic-settings==2.2.1
+pyjwt==2.8.0
+# ---- GPU 节点按需（不装则走 mock）----
+# funasr==1.1.x          # FunASR 流式（paraformer-zh-streaming）
+# torch==2.3.0           # CUDA 版按 GPU 节点驱动选择
+# sentence-transformers  # 或 flagembedding（BGE bge-small-zh-v1.5，512 维）

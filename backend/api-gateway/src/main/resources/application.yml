@@ -1,0 +1,62 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  config:
+    import: optional:nacos:api-gateway-dev.yaml   # 配置中心（optional：本地无 Nacos 也能启动）
+  cloud:
+    nacos:
+      server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+      discovery:
+        fail-fast: false
+      config:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+    gateway:
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Headers Access-Control-Allow-Methods, RETAIN_UNIQUE
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            allowCredentials: true
+      routes:
+        # TODO(W2)：在各路由上加 AuthFilterFactory（JWT 验签前置，调 auth-service /internal/auth/verify）
+        - id: auth-service
+          uri: lb://auth-service
+          predicates: [ "Path=/api/auth/**" ]
+          filters: [ "StripPrefix=0" ]
+        - id: interview-service
+          uri: lb://interview-service
+          predicates: [ "Path=/api/interview/**" ]
+        - id: resume-service
+          uri: lb://resume-service
+          predicates: [ "Path=/api/resume/**" ]
+        - id: room-service
+          uri: lb://room-service
+          predicates: [ "Path=/api/room/**" ]
+        - id: notify-service
+          uri: lb://notify-service
+          predicates: [ "Path=/api/notify/**" ]
+        - id: file-service
+          uri: lb://file-service
+          predicates: [ "Path=/api/file/**" ]
+        # AI 编排（跨语言 REST，Java 侧无感知）
+        - id: ai-service
+          uri: ${AI_SERVICE_URI:http://127.0.0.1:9010}
+          predicates: [ "Path=/api/ai/**" ]
+      # 限流（令牌桶）：骨架期先放通，W2 接入 RedisRequestRateLimiter
+      # filters: - name: RequestRateLimiter ... key-resolver / redis-rate-limiter
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway,metrics
+
+logging:
+  pattern:
+    level: '%5p [%X{traceId}]'

@@ -23,3 +23,20 @@ Thumbs.db
 *.log
 logs/
 data/
+
+# WorkBuddy 工具目录（不进仓库）
+.workbuddy/
+
+# 文档备份
+*.bak
+*.bak-*
+
+# 备份与离线包
+backup/
+deploy/offline/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
