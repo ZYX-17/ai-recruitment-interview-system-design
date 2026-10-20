@@ -2,6 +2,11 @@ package com.recruit.common.result;
 
 import lombok.Getter;
 
+import java.util.Arrays;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 /**
  * 错误码全集（与开发文档 3.3 对齐：AUTH1/RSM2/ITV3/ROM4/AIS5/NTF6/FIL7/GW9 号段）。
  *
@@ -37,6 +42,8 @@ public enum ErrorCode {
     SUCCESS("0", "成功", 200),
     SYS_ERROR("SYS500", "系统繁忙，请稍后再试", 500),
     PARAM_INVALID("SYS400", "参数校验失败", 400),
+    /** 通用 404：对象不存在。具体资源可用带业务前缀的错误码覆盖。 */
+    RESOURCE_NOT_FOUND("SYS404", "资源不存在", 404),
     /** 同一个 Idempotency-Key 的首次请求仍在执行，客户端应稍后重试。 */
     IDEMPOTENT_IN_PROGRESS("SYS409", "请求正在处理中，请勿重复提交", 409),
 
@@ -108,6 +115,28 @@ public enum ErrorCode {
      * 业务码仍放在响应 body 的 {@code code} 字段，两者互不替代。
      */
     private final int httpStatus;
+
+    /** 业务码 -> 枚举 的索引，供注解里用字符串配置错误码时反查。 */
+    private static final Map<String, ErrorCode> BY_CODE = Arrays.stream(values())
+            .collect(Collectors.toUnmodifiableMap(ErrorCode::getCode, Function.identity()));
+
+    /**
+     * 按业务码反查枚举。
+     *
+     * <p>用途：注解属性里只能写常量字符串，例如 {@code @OwnerCheck(notFoundCode = "SYS404")}，
+     * 切面运行时通过本方法转成 {@link ErrorCode}。</p>
+     *
+     * @param code 业务码，例如 SYS404
+     * @return 对应枚举
+     * @throws IllegalArgumentException 错误码未登记时抛出（属于配置错误，应尽早失败）
+     */
+    public static ErrorCode fromCode(String code) {
+        ErrorCode errorCode = BY_CODE.get(code);
+        if (errorCode == null) {
+            throw new IllegalArgumentException("未登记的错误码: " + code);
+        }
+        return errorCode;
+    }
 
     /**
      * 兼容旧写法的两参构造：未显式指定 HTTP 状态码时按 500 处理。

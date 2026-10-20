@@ -67,6 +67,15 @@
       <optional>true</optional>
     </dependency>
 
+    <!-- Spring AOP + AspectJ：@DataScope / @OwnerCheck 切面需要。
+         optional=true：由 auth/interview 等服务按需引入 starter-aop；
+         未引入的服务不会加载切面自动配置。 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-aop</artifactId>
+      <optional>true</optional>
+    </dependency>
+
     <!-- 测试依赖：JUnit 5、AssertJ、Mockito、spring-test（MockHttpServletRequest 等）。
          scope=test 表示只在编译和运行测试时可见，不会传递给依赖 common 的业务服务。 -->
     <dependency>
