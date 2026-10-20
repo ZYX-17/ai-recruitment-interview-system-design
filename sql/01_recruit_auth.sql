@@ -55,7 +55,7 @@ CREATE TABLE iam_role (
 -- ----------------------------------------------------------------------------
 CREATE TABLE iam_permission (
   id              BIGINT UNSIGNED NOT NULL,
-  permission_code VARCHAR(128) NOT NULL,           -- 如 interview:application:transfer
+  permission_code VARCHAR(128) NOT NULL,           -- 如 interview:application:transfer；一行一码，不重复建 BUTTON/API 两行
   type            VARCHAR(16)  NOT NULL,            -- MENU / BUTTON / API
   parent_id       BIGINT UNSIGNED NULL,
   name            VARCHAR(64)  NOT NULL,

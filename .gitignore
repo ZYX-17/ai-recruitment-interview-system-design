@@ -26,6 +26,7 @@ data/
 
 # WorkBuddy 工具目录（不进仓库）
 .workbuddy/
+.yonbuddy/
 
 # 文档备份
 *.bak

@@ -67,7 +67,7 @@ CREATE TABLE application (
   round_no      INT           NOT NULL DEFAULT 0,   -- 当前轮次
   stage_flow    JSON         NOT NULL,              -- 按岗位模板复制的流转配置
   match_score   DECIMAL(5,2) NULL,                 -- AI 匹配分快照（0~100）
-  status        VARCHAR(16)  NOT NULL DEFAULT 'IN_PROGRESS', -- IN_PROGRESS/PASSED/REJECTED/WITHDRAWN/OFFERED/HIRED
+  status        VARCHAR(16)  NOT NULL DEFAULT 'IN_PROGRESS', -- IN_PROGRESS/PASSED/REJECTED/WITHDRAWN/TRANSFERRED/OFFERED/HIRED
   reject_reason VARCHAR(255) NULL,
   source        VARCHAR(32)  NOT NULL DEFAULT 'PORTAL', -- PORTAL / IMPORT
   created_at    DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -112,7 +112,7 @@ CREATE TABLE interview (
   mode            VARCHAR(16)   NOT NULL,          -- ONLINE / ASYNC
   room_type       VARCHAR(24)   NOT NULL DEFAULT 'ONE_TO_ONE', -- ONE_TO_ONE / ONE_TO_MANY
   room_id         BIGINT UNSIGNED NULL,           -- room-service 回填
-  status          VARCHAR(16)   NOT NULL DEFAULT 'SCHEDULED', -- SCHEDULED/IN_PROGRESS/COMPLETED/CANCELLED
+  status          VARCHAR(16)   NOT NULL DEFAULT 'SCHEDULED', -- ROOM_PENDING/SCHEDULED/IN_PROGRESS/COMPLETED/CANCELLED/NO_SHOW
   cancel_reason   VARCHAR(255)  NULL,
   created_at      DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at      DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
@@ -212,7 +212,7 @@ CREATE TABLE offer (
   entry_date         DATE         NULL,
   expire_at          DATETIME(3)  NOT NULL,          -- 过期自动失效（延迟消息）
   confirm_token_hash CHAR(64)     NOT NULL,          -- sha256(token)，邮件链接不存明文
-  status             VARCHAR(16)  NOT NULL DEFAULT 'DRAFT', -- DRAFT/SENT/CONFIRMED/EXPIRED/REJECTED/WITHDRAWN
+  status             VARCHAR(16)  NOT NULL DEFAULT 'DRAFT', -- DRAFT/PENDING_APPROVAL/SENT/CONFIRMED/DECLINED/EXPIRED/WITHDRAWN
   onboarding_json    JSON         NULL,              -- 入职引导信息
   operator_id        BIGINT UNSIGNED NOT NULL,
   confirmed_at       DATETIME(3)  NULL,
