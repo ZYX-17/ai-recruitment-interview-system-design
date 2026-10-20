@@ -42,7 +42,7 @@ public final class EventTypes {
 
     // 面试流程（A/C 域）
     public static final String INTERVIEW_SCHEDULED = "interview.scheduled";   // room 监听建房
-    // 注：文档 5.2 写作 interview.canceled（单 l）；A/C 域尚未对齐，B 暂不改动。
+    // 2026-10-19 已与总开发文档对齐为 interview.cancelled（dev ea35b16）。
     public static final String INTERVIEW_CANCELLED = "interview.cancelled";
     public static final String INTERVIEW_RESULT_SUBMITTED = "interview.result.submitted";
     public static final String STAGE_CHANGED = "application.stage.changed";

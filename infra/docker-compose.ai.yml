@@ -23,13 +23,16 @@ services:
       MYSQL_DB: ${MYSQL_DB:-recruit_ai}
       REDIS_HOST: ${REDIS_HOST:-host.docker.internal}
       REDIS_PORT: ${REDIS_PORT:-6379}
-      VLLM_BASE_URL: ${VLLM_BASE_URL:-http://host.docker.internal:8000/v1}
-      VLLM_MODEL: ${VLLM_MODEL:-Qwen2.5-7B-Instruct-AWQ}
+      AI_MODE: ${AI_MODE:-auto}
+      AI_ALLOW_MOCK: ${AI_ALLOW_MOCK:-true}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-30}
+      AI_LOCAL_TIMEOUT_SECONDS: ${AI_LOCAL_TIMEOUT_SECONDS:-60}
       CLOUD_BASE_URL: ${CLOUD_BASE_URL:-https://api.deepseek.com/v1}
       CLOUD_API_KEY: ${CLOUD_API_KEY:-}
       CLOUD_MODEL: ${CLOUD_MODEL:-deepseek-chat}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434/v1}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:1.7b}
+      LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL:-http://host.docker.internal:11434/v1}
+      LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-qwen2.5:7b}
+      LOCAL_LLM_API_KEY: ${LOCAL_LLM_API_KEY:-EMPTY}
       AI_WORKER_URL: ${AI_WORKER_URL:-http://ai-worker:8001}
       MINERU_WORKER_URL: ${MINERU_WORKER_URL:-http://mineru-worker:8002}
     depends_on:

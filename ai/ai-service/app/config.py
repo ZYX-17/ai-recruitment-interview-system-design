@@ -18,14 +18,23 @@ class Settings(BaseSettings):
     redis_host: str = "127.0.0.1"
     redis_port: int = 6379
 
-    # LLM 档位（OpenAI 兼容端点；四级降级见 services/llm_router.py）
-    vllm_base_url: str = "http://127.0.0.1:8000/v1"     # GPU 节点 vLLM（主档）
-    vllm_model: str = "Qwen2.5-7B-Instruct-AWQ"
-    cloud_base_url: str = "https://api.deepseek.com/v1"  # 云端备档
-    cloud_api_key: str = ""                              # DeepSeek/通义 API Key（环境变量注入）
-    cloud_model: str = "deepseek-chat"
-    ollama_base_url: str = "http://127.0.0.1:11434/v1"   # 无 GPU 档
-    ollama_model: str = "qwen3:1.7b"
+    # LLM 路由：cloud 优先 → local（OpenAI 兼容）→ mock（可选）
+    ai_mode: str = "auto"              # auto / cloud / local / mock
+    ai_allow_mock: bool = True         # 云端+本地都不可用时是否允许 Mock
+    ai_timeout_seconds: float = 30.0
+    ai_local_timeout_seconds: float = 60.0
+
+    # 云端 LLM（OpenAI 兼容；DeepSeek flash/fast 档）
+    cloud_base_url: str = "https://api.deepseek.com/v1"
+    cloud_api_key: str = ""            # DeepSeek API Key（环境变量注入）
+    cloud_model: str = "deepseek-chat" # DeepSeek flash/fast；如官方模型名不同改这里
+
+    # 本地 LLM（OpenAI 兼容：默认 Ollama；有 GPU 可切 vLLM）
+    # Ollama: http://127.0.0.1:11434/v1 + qwen2.5:7b
+    # vLLM:   http://127.0.0.1:8000/v1 + Qwen2.5-7B-Instruct-AWQ
+    local_llm_base_url: str = "http://127.0.0.1:11434/v1"
+    local_llm_model: str = "qwen2.5:7b"
+    local_llm_api_key: str = "EMPTY"
 
     # 内部依赖
     ai_worker_url: str = "http://127.0.0.1:8001"         # FunASR / BGE

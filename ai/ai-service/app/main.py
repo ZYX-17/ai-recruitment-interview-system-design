@@ -22,12 +22,16 @@ app.include_router(tasks.router)
 
 
 @app.get("/health")
+@app.get("/api/ai/health")
 async def health():
     return {
         "status": "ok",
         "service": settings.app_name,
         "port": settings.port,
-        "llm_primary": settings.vllm_model,
+        "ai_mode": settings.ai_mode,
+        "cloud_model": settings.cloud_model,
+        "local_model": settings.local_llm_model,
+        "local_base_url": settings.local_llm_base_url,
     }
 
 
