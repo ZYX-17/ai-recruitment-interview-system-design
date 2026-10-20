@@ -37,6 +37,8 @@ public enum ErrorCode {
     SUCCESS("0", "成功", 200),
     SYS_ERROR("SYS500", "系统繁忙，请稍后再试", 500),
     PARAM_INVALID("SYS400", "参数校验失败", 400),
+    /** 同一个 Idempotency-Key 的首次请求仍在执行，客户端应稍后重试。 */
+    IDEMPOTENT_IN_PROGRESS("SYS409", "请求正在处理中，请勿重复提交", 409),
 
     // AUTH1xxx 认证/令牌
     AUTH_LOGIN_FAILED("AUTH1001", "用户名或密码错误", 401),
