@@ -1,0 +1,2 @@
+com.recruit.common.config.CommonWebAutoConfiguration
+com.recruit.common.config.CommonIdempotencyAutoConfiguration

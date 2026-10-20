@@ -11,17 +11,68 @@
   <artifactId>common</artifactId>
   <description>公共基础件：Result/错误码/traceId/雪花ID/Redis Key 契约（不放业务逻辑）</description>
   <dependencies>
+    <!-- Spring Boot 基础能力（Bean 容器、自动配置、日志门面等）。不引入 web starter，避免 common 反向绑定 Web 运行环境。 -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter</artifactId>
     </dependency>
+
+    <!-- 仅使用 Jackson 注解（如 @JsonInclude），不引入完整 databind，保持公共模块轻量。 -->
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-annotations</artifactId>
     </dependency>
+
+    <!-- SLF4J 日志 API：UserContextFilter、GlobalExceptionHandler 通过它输出日志。 -->
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
+    </dependency>
+
+    <!-- Spring MVC 的注解与异常类型（@RestControllerAdvice、ResponseEntity、BindException 等）。
+         只依赖 spring-web，不引入 spring-boot-starter-web，业务服务自行决定是否做 Web 应用。 -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-web</artifactId>
+    </dependency>
+
+    <!-- Servlet API：UserContextFilter 继承 OncePerRequestFilter 需要它。
+         scope=provided：运行时由 Tomcat 等容器提供，不能打进业务 jar，否则会与容器版本冲突。 -->
+    <dependency>
+      <groupId>jakarta.servlet</groupId>
+      <artifactId>jakarta.servlet-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- Jakarta Bean Validation API：GlobalExceptionHandler 捕获 ConstraintViolationException 需要该类型。
+         这里只引 API，具体实现（Hibernate Validator）由业务服务的 web starter 提供。 -->
+    <dependency>
+      <groupId>jakarta.validation</groupId>
+      <artifactId>jakarta.validation-api</artifactId>
+    </dependency>
+
+    <!-- Spring Data Redis：IdempotencyService 使用 StringRedisTemplate 做 SETNX 与结果缓存。
+         optional=true：由各业务服务按需引入 starter，避免 common 强制所有服务连接 Redis
+         （notify/file 当前没有 Redis 依赖，不能因为 common 被动引入自动配置）。 -->
+    <dependency>
+      <groupId>org.springframework.data</groupId>
+      <artifactId>spring-data-redis</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- Jackson databind：幂等结果需要 JSON 序列化/反序列化。optional 同上，由业务服务提供实现。 -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- 测试依赖：JUnit 5、AssertJ、Mockito、spring-test（MockHttpServletRequest 等）。
+         scope=test 表示只在编译和运行测试时可见，不会传递给依赖 common 的业务服务。 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 </project>
