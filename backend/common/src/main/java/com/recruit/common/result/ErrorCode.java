@@ -4,7 +4,32 @@ import lombok.Getter;
 
 /**
  * 错误码全集（与开发文档 3.3 对齐：AUTH1/RSM2/ITV3/ROM4/AIS5/NTF6/FIL7/GW9 号段）。
- * 新增错误码先登记文档再写代码。
+ *
+ * <p><b>号段规则：</b>号段前缀表示归属模块，方便前端按模块做统一提示，也方便日志按号段统计：</p>
+ * <ul>
+ *   <li>{@code AUTH1xxx}：认证、令牌、权限；</li>
+ *   <li>{@code RSM2xxx}：简历、候选人、人才库；</li>
+ *   <li>{@code ITV3xxx}：投递、排期、面试；</li>
+ *   <li>{@code ROM4xxx}：面试房间；</li>
+ *   <li>{@code AIS5xxx}：AI 能力；</li>
+ *   <li>{@code NTF6xxx}：通知；</li>
+ *   <li>{@code FIL7xxx}：文件；</li>
+ *   <li>{@code GW9xxx}：网关与公共能力。</li>
+ * </ul>
+ *
+ * <p><b>三个字段的分工：</b></p>
+ * <ul>
+ *   <li>{@code code}：业务码，放在响应体里，前端用它判断具体错误（如 ITV3101 排期冲突）；</li>
+ *   <li>{@code defaultMessage}：默认展示文案，调用方不传自定义文案时使用；</li>
+ *   <li>{@code httpStatus}：HTTP 状态码，让网关、监控、浏览器能正确识别成功/失败类型。</li>
+ * </ul>
+ *
+ * <p><b>为什么 HTTP 状态码要放在错误码上：</b>如果让每个 Service 自己决定返回 400 还是 409，
+ * 同一种错误在不同接口会出现不同状态码。集中定义后，{@code GlobalExceptionHandler}
+ * 只读 {@link #getHttpStatus()}，行为保持一致。</p>
+ *
+ * <p>新增错误码的流程：先在本文件登记，再同步到开发文档 3.3 的错误码表，最后补单元测试。
+ * 不要复用已有码表达新语义，否则前端和历史日志无法区分。</p>
  */
 @Getter
 public enum ErrorCode {
@@ -70,15 +95,38 @@ public enum ErrorCode {
     GW_RATE_LIMITED("GW9003", "请求过于频繁", 429),
     GW_INTERNAL_FORBIDDEN("GW9005", "内部接口禁止外部访问", 403);
 
+    /** 业务错误码，返回在响应体的 {@code code} 字段；成功固定为 "0"。 */
     private final String code;
+
+    /** 默认展示文案，要求是用户能看懂的短句，不包含技术细节。 */
     private final String defaultMessage;
-    /** HTTP 状态码；由 GlobalExceptionHandler 使用，业务码仍放在响应 body。 */
+
+    /**
+     * HTTP 状态码。由 GlobalExceptionHandler 读取并写到响应状态行；
+     * 业务码仍放在响应 body 的 {@code code} 字段，两者互不替代。
+     */
     private final int httpStatus;
 
+    /**
+     * 兼容旧写法的两参构造：未显式指定 HTTP 状态码时按 500 处理。
+     *
+     * <p>保留它是为了不破坏已有枚举常量的声明；新错误码建议直接用三参构造，
+     * 明确写出语义状态码（404/409/429 等）。</p>
+     *
+     * @param code           业务码
+     * @param defaultMessage 默认文案
+     */
     ErrorCode(String code, String defaultMessage) {
         this(code, defaultMessage, 500);
     }
 
+    /**
+     * 完整构造。
+     *
+     * @param code           业务码，全局唯一，建议带模块前缀
+     * @param defaultMessage 默认展示文案
+     * @param httpStatus     HTTP 状态码，例如 400/401/403/404/409/429/500/503
+     */
     ErrorCode(String code, String defaultMessage, int httpStatus) {
         this.code = code;
         this.defaultMessage = defaultMessage;
