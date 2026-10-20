@@ -41,3 +41,6 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+
+# Maven local repo (worktree-local)
+.m2repo/
