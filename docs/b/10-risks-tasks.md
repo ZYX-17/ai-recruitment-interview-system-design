@@ -35,26 +35,32 @@
 ## 13. 任务清单
 
 ### P0 · 骨架与公共件
-- [ ] 分支 `feat/resume-talent`（已完成）
-- [ ] `common`：`ErrorCode` 补 RSM/FIL/AIS；`RedisKeys` 补 resume 键；`PageResult`
-- [ ] `contracts`：`EventTypes` 对齐；事件 payload DTO
-- [ ] 全局异常、trace filter、MP 分页/乐观锁、Jackson Long→String
-- [ ] Flyway 迁移（V1_0 resume/file）
-- [ ] local profile / `.env.example`
+- [x] 分支 `feat/resume-talent`（已完成）
+- [x] `common`：`ErrorCode` 补 RSM/FIL/AIS；`RedisKeys` 补 resume 键；`PageResult`
+- [x] `contracts`：`EventTypes` 对齐
+- [ ] `contracts`：事件 payload DTO
+- [x] 全局异常、trace filter
+- [x] file-service MP 分页/乐观锁（resume-service 待接入）
+- [ ] Jackson Long→String（当前 file DTO 手动把 ID 转字符串）
+- [x] Flyway 迁移（V1_0 resume/file，`enabled: true`）
+- [ ] local profile / `.env.example`（AI 侧已有；Java 服务待补）
 
 ### P1 · file-service
-- [ ] `file_meta` 实体/Mapper/Service
-- [ ] MinIO 客户端、桶初始化
-- [ ] 预签名上传/完成/分片/下载/内部接口
-- [ ] MIME/大小/SHA-256/秒传
-- [ ] 错误码与测试
+- [x] `file_meta` 实体/Mapper/Service
+- [x] MinIO 客户端、桶初始化
+- [x] 预签名上传/完成/下载/内部接口
+- [ ] 分片上传（录像 ≤500MB 可单次预签名 PUT，暂缓）
+- [x] MIME/大小/SHA-256/秒传
+- [x] 错误码与单测（`FilePolicyTest` 6 项通过）
 
 ### P2 · resume-service 核心
-- [ ] 14 表实体/Mapper
-- [ ] person/resume/parse task 创建与状态
-- [ ] 上传编排 + Outbox `resume.received`
-- [ ] parse-status/markdown/structured/retry
-- [ ] 任务列表/详情
+- [x] 核心 6 表实体/Mapper（person/resume/parse_task/version/job_snapshot/local_message）
+- [ ] 其余 8 表实体/Mapper（skill/tag/talent/rule/match/merge 等）
+- [x] person/resume/parse task 创建与状态
+- [x] 上传编排（经 file-service 内部接口校验）+ Outbox `resume.received` 写入
+- [ ] Outbox 发布器（RabbitMQ confirms/退避重试）
+- [x] parse-status/markdown/structured/retry
+- [x] 任务列表/详情
 - [ ] 事件消费 `job.published/job.updated`
 
 ### P3 · 解析流水线

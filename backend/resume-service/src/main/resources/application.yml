@@ -33,7 +33,7 @@ spring:
   elasticsearch:
     uris: ${ES_URI:http://127.0.0.1:9200}
   flyway:
-    enabled: false   # W1 起改 true；DDL 母版见 sql/04_recruit_resume.sql
+    enabled: true    # 建表由 V1_0__init_resume.sql 完成；DDL 母版见 sql/04_recruit_resume.sql
     locations: classpath:db/migration
     baseline-on-migrate: true
 
@@ -68,3 +68,19 @@ recruit:
   # ES 挂时切 mysql-like（Nacos 开关）
   search:
     fallback-to-mysql: ${SEARCH_FALLBACK:false}
+  # 雪花 ID 多实例部署时 worker-id/datacenter-id 必须各不相同（0~31）
+  id:
+    worker-id: ${WORKER_ID:1}
+    datacenter-id: ${DATACENTER_ID:1}
+  # 手机号查重 HMAC 密钥；生产环境必须通过 PHONE_PEPPER 注入随机值
+  dedup:
+    phone-pepper: ${PHONE_PEPPER:dev-phone-pepper}
+  # 服务间内部令牌（file-service /internal/**）
+  internal:
+    token: ${INTERNAL_TOKEN:dev-internal-token}
+  # 无 Nacos 本地开发时直连 file-service；留空则走服务发现
+  file-service:
+    url: ${FILE_SERVICE_URL:}
+  # Outbox 投递交换机
+  outbox:
+    exchange: ${OUTBOX_EXCHANGE:recruit.resume}

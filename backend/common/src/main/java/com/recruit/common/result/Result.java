@@ -2,6 +2,7 @@ package com.recruit.common.result;
 
 import com.recruit.common.trace.TraceIdUtil;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 
@@ -23,9 +24,13 @@ import java.io.Serializable;
  * <p>判断成功请用 {@link #isSuccess()} 或比较 {@code code == "0"}，
  * 不要用 HTTP 200 判断，因为业务失败也可能返回 4xx/5xx。</p>
  *
+ * <p>无参构造供 Feign/Jackson 反序列化使用：服务间调用（如 resume-service → file-service）
+ * 需要把对方返回的 Result 包装还原成对象，没有无参构造 Jackson 会直接失败。</p>
+ *
  * @param <T> 业务数据类型
  */
 @Data
+@NoArgsConstructor
 public class Result<T> implements Serializable {
 
     /** 业务码；"0" 表示成功，其余为错误码（如 ITV3001、SYS400）。 */

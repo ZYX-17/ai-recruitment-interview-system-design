@@ -50,6 +50,7 @@ public enum ErrorCode {
     RESUME_NOT_FOUND("RSM2001", "简历不存在", 404),
     PERSON_NOT_FOUND("RSM2002", "候选人不存在", 404),
     PERSON_DUPLICATED("RSM2003", "候选人已存在或重复投递", 409),
+    RESUME_VERSION_CONFLICT("RSM2004", "简历已被修改，请刷新后重试", 409),
     RESUME_PARSE_FAILED("RSM2101", "简历解析失败", 422),
     PARSE_TASK_NOT_FOUND("RSM2102", "解析任务不存在", 404),
     PARSE_RETRY_EXCEEDED("RSM2103", "解析重试次数超限", 429),

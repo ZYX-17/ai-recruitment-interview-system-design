@@ -47,6 +47,20 @@ public final class RedisKeys {
      */
     public static final String AUTH_RATE = "auth:rate:";
 
+    // ==================== 简历 / 人才 ====================
+
+    /** 解析状态缓存：resume:parse:{resumeId}，TTL 建议 30 秒。 */
+    public static final String RESUME_PARSE = "resume:parse:";
+
+    /** 匹配结果缓存：resume:match:{cacheKey}，cacheKey 由 jobId+resumeId+版本派生。 */
+    public static final String RESUME_MATCH = "resume:match:";
+
+    /** Embedding 幂等：resume:embed:{sha256}，同一内容只调用一次 ai-worker。 */
+    public static final String RESUME_EMBED = "resume:embed:";
+
+    /** 去重提示缓存：resume:merge:{personId}（可选）。 */
+    public static final String RESUME_MERGE = "resume:merge:";
+
     // ==================== 房间 ====================
 
     /** 房间并发/名额锁：room:lock:{roomId} */
@@ -115,6 +129,46 @@ public final class RedisKeys {
      */
     public static String idempotentHttp(String scope, String idempotencyKey) {
         return IDEMPOTENT_HTTP + requireSegment(scope, "scope") + ":" + requireText(idempotencyKey, "idempotencyKey");
+    }
+
+    /**
+     * 构造解析状态缓存 Key。
+     *
+     * @param resumeId 简历 ID
+     * @return resume:parse:{resumeId}
+     */
+    public static String resumeParse(long resumeId) {
+        return RESUME_PARSE + resumeId;
+    }
+
+    /**
+     * 构造匹配结果缓存 Key。
+     *
+     * @param cacheKey jobId+resumeId(+版本) 派生值，不能为空
+     * @return resume:match:{cacheKey}
+     */
+    public static String resumeMatch(String cacheKey) {
+        return RESUME_MATCH + requireText(cacheKey, "cacheKey");
+    }
+
+    /**
+     * 构造 Embedding 幂等 Key。
+     *
+     * @param sha256 文件内容摘要
+     * @return resume:embed:{sha256}
+     */
+    public static String resumeEmbed(String sha256) {
+        return RESUME_EMBED + requireText(sha256, "sha256");
+    }
+
+    /**
+     * 构造去重提示缓存 Key。
+     *
+     * @param personId 候选人 ID
+     * @return resume:merge:{personId}
+     */
+    public static String resumeMerge(long personId) {
+        return RESUME_MERGE + personId;
     }
 
     /**

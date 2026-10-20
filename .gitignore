@@ -44,3 +44,6 @@ venv/
 
 # Maven local repo (worktree-local)
 .m2repo/
+
+# Claude Code 本地配置（个人偏好，不进仓库）
+.claude/
