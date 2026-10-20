@@ -23,7 +23,7 @@ spring:
       max-file-size: 500MB        # 录像 ≤500MB；简历另按 biz_type 校验 ≤20MB
       max-request-size: 500MB
   flyway:
-    enabled: false   # W1 起改 true；DDL 母版见 sql/06_recruit_file.sql
+    enabled: true    # 建表由 V1_0__init_file.sql 完成；DDL 母版见 sql/06_recruit_file.sql
     locations: classpath:db/migration
     baseline-on-migrate: true
 
@@ -53,3 +53,7 @@ recruit:
     secret-key: ${MINIO_SECRET_KEY:minioadmin}
     bucket: ${MINIO_BUCKET:recruit}
     presign-ttl-minutes: 10
+    init-bucket: true
+  # 服务间调用令牌（/internal/**）；生产环境必须通过 INTERNAL_TOKEN 注入
+  internal:
+    token: ${INTERNAL_TOKEN:dev-internal-token}
