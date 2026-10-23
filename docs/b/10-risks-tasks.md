@@ -58,10 +58,10 @@
 - [ ] 其余 8 表实体/Mapper（skill/tag/talent/rule/match/merge 等）
 - [x] person/resume/parse task 创建与状态
 - [x] 上传编排（经 file-service 内部接口校验）+ Outbox `resume.received` 写入
-- [ ] Outbox 发布器（RabbitMQ confirms/退避重试）
+- [x] Outbox 发布器（RabbitMQ confirms/1-2-4-8-16 分钟退避/DEAD）
 - [x] parse-status/markdown/structured/retry
 - [x] 任务列表/详情
-- [ ] 事件消费 `job.published/job.updated`
+- [x] 事件消费 `job.published/job.updated`（幂等 + 版本比较 + 快照 upsert）
 
 ### P3 · 解析流水线
 - [ ] mineru-worker mock/真实 MinerU

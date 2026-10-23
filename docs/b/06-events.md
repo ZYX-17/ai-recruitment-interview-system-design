@@ -5,7 +5,7 @@
 
 ## 6. 事件契约
 
-### 6.1 信封
+### 6.1 信封与路由
 
 ```json
 {
@@ -19,6 +19,25 @@
   "payload": {}
 }
 ```
+
+**路由约定（与 A 文档 §6.1 统一）**：
+
+| 项 | 规则 |
+|---|---|
+| exchange | `recruit.events`（topic，持久化） |
+| routingKey | 与 `eventType` 一致，如 `resume.received` |
+| queue | `{service}.{event-type}` |
+| DLQ | `{queue}.dlq`，绑到 `recruit.dlx` |
+
+B 已声明的队列：
+
+| 队列 | routingKey | 用途 |
+|---|---|---|
+| `mineru.resume-received` | `resume.received` | mineru-worker 消费解析任务 |
+| `resume.job-published` | `job.published` | resume-service 更新 `job_snapshot` |
+| `resume.job-updated` | `job.updated` | resume-service 更新 `job_snapshot` |
+
+> Outbox 发布器每 5s 扫描 PENDING/FAILED；publisher confirm ack 后置 SENT，失败按 1/2/4/8/16 分钟退避，5 次转 DEAD。消费端先 `INSERT IGNORE` 幂等占位，再处理业务。
 
 ### 6.2 B 发布的事件
 

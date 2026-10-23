@@ -29,8 +29,8 @@ public class OutboxService {
     private final IdWorker idWorker;
     private final ObjectMapper objectMapper;
 
-    /** 交换机名；B 域默认 recruit.resume，可由 Nacos/环境变量覆盖。 */
-    @Value("${recruit.outbox.exchange:recruit.resume}")
+    /** 交换机名；与 A 文档 §6.1 统一为 recruit.events（routingKey = eventType）。 */
+    @Value("${recruit.outbox.exchange:recruit.events}")
     private String exchange;
 
     /**

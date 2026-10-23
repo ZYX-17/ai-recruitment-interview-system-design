@@ -30,6 +30,12 @@ spring:
     password: ${RABBITMQ_PASSWORD:guest}
     publisher-confirm-type: correlated
     publisher-returns: true
+    listener:
+      simple:
+        # MQ_ENABLED=false 时不启动消费者，最小档只跑 HTTP/DB
+        auto-startup: ${MQ_ENABLED:true}
+        # 失败不无限重投：坏消息进 {queue}.dlq，避免毒消息循环
+        default-requeue-rejected: false
   elasticsearch:
     uris: ${ES_URI:http://127.0.0.1:9200}
   flyway:
@@ -81,6 +87,16 @@ recruit:
   # 无 Nacos 本地开发时直连 file-service；留空则走服务发现
   file-service:
     url: ${FILE_SERVICE_URL:}
-  # Outbox 投递交换机
+  # 事件路由（与 A 文档 §6.1 对齐：exchange=recruit.events，routingKey=eventType）
+  mq:
+    enabled: ${MQ_ENABLED:true}
+    events-exchange: ${EVENTS_EXCHANGE:recruit.events}
+    dlx: ${EVENT_DLX:recruit.dlx}
+    mineru-resume-queue: ${MINERU_RESUME_QUEUE:mineru.resume-received}
+    job-published-queue: ${JOB_PUBLISHED_QUEUE:resume.job-published}
+    job-updated-queue: ${JOB_UPDATED_QUEUE:resume.job-updated}
+  # Outbox 投递与重试
   outbox:
-    exchange: ${OUTBOX_EXCHANGE:recruit.resume}
+    exchange: ${EVENTS_EXCHANGE:recruit.events}
+    poll-interval-ms: ${OUTBOX_POLL_MS:5000}
+    batch-size: ${OUTBOX_BATCH_SIZE:50}
