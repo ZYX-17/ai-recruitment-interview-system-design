@@ -79,6 +79,14 @@
 | GET | `/internal/files/{id}/meta` | `X-Internal-Token` | 元数据 |
 | POST | `/internal/files/{id}/complete` | `X-Internal-Token` | 完成上传 |
 
+**解析回调（mineru-worker → resume-service，`X-Internal-Token`）**：
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/internal/resumes/{id}/parse-completed` | 解析成功：`taskNo, markdownFileId, parserVersion, chunkCount?` |
+| POST | `/internal/resumes/{id}/parse-failed` | 解析失败：`taskNo, reason`；按 retryCount 置 FAILED/DEAD |
+| GET | `/internal/resumes/{id}/parse-status` | worker 排障/补偿查询 |
+
 ### 5.4 ai 端点
 
 | 方法 | 路径 | 权限 | 说明 |

@@ -43,7 +43,7 @@ B 已声明的队列：
 
 | 事件 | 载荷 | 消费方 |
 |---|---|---|
-| `resume.received` | resumeId, personId, fileId, fileKey, channel | resume 解析编排 / mineru-worker |
+| `resume.received` | resumeId, personId, taskNo, fileId, fileKey, channel | resume 解析编排 / mineru-worker |
 | `resume.parse.completed` | resumeId, personId, taskNo, versionNo, chunkCount | resume 向量化/ES、ai 实体抽取 |
 | `resume.parse.failed` | resumeId, taskNo, reason, attempt | notify（HR 可见） |
 | `candidate.duplicated` | personId, duplicatePersonIds, similarity, dedupType | notify（HR 查重提醒） |

@@ -17,6 +17,8 @@ import com.recruit.resume.client.dto.FileMetaDTO;
 import com.recruit.resume.client.dto.InternalPresignDownloadRequest;
 import com.recruit.resume.dto.CreateResumeRequest;
 import com.recruit.resume.dto.CreateResumeResponse;
+import com.recruit.resume.dto.ParseCompletedRequest;
+import com.recruit.resume.dto.ParseFailedRequest;
 import com.recruit.resume.dto.ParseTaskVO;
 import com.recruit.resume.dto.ResumeMarkdownVO;
 import com.recruit.resume.dto.ResumeParseStatusVO;
@@ -131,7 +133,7 @@ public class ResumeService {
         taskMapper.insert(task);
 
         outboxService.append(EventTypes.RESUME_RECEIVED, String.valueOf(resumeId), "RESUME",
-                receivedPayload(resume));
+                receivedPayload(resume, task));
 
         return new CreateResumeResponse(String.valueOf(resumeId), resume.getResumeNo(),
                 String.valueOf(person.getId()), task.getTaskNo(), resume.getParseStatus(), false);
@@ -171,15 +173,94 @@ public class ResumeService {
 
     public ResumeParseStatusVO getParseStatus(long resumeId) {
         Resume resume = requireResume(resumeId);
-        ResumeParseTask task = latestTask(resumeId);
-        return new ResumeParseStatusVO(
-                String.valueOf(resumeId),
-                task == null ? null : task.getTaskNo(),
-                resume.getParseStatus(),
-                task == null ? null : task.getStage(),
-                task == null ? null : task.getProgress(),
-                task == null ? null : task.getErrorMsg(),
-                task == null ? null : task.getRetryCount());
+        return statusView(resume, latestTask(resumeId));
+    }
+
+    /**
+     * mineru-worker 解析成功回调：任务成功、写 Markdown 文件、追加版本并发布
+     * {@code resume.parse.completed}。重复回调按 taskNo 幂等返回。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ResumeParseStatusVO markParseCompleted(long resumeId, ParseCompletedRequest request) {
+        Resume resume = requireResume(resumeId);
+        ResumeParseTask task = requireTask(resumeId, request.taskNo());
+        if (ParseTaskStatus.SUCCESS.equals(task.getStatus())) {
+            return statusView(resume, task);
+        }
+
+        int nextVersion = (resume.getCurrentVersionNo() == null ? 0 : resume.getCurrentVersionNo()) + 1;
+        task.setStatus(ParseTaskStatus.SUCCESS);
+        task.setStage("PARSE");
+        task.setProgress(100);
+        task.setErrorMsg(null);
+        if (taskMapper.updateById(task) == 0) {
+            throw new BizException(ErrorCode.SYS_ERROR, "任务状态已变更，请重试");
+        }
+
+        resume.setMarkdownFileId(request.markdownFileId());
+        resume.setParseStatus(ResumeStatus.SUCCESS);
+        resume.setCurrentVersionNo(nextVersion);
+        if (resumeMapper.updateById(resume) == 0) {
+            throw new BizException(ErrorCode.RESUME_VERSION_CONFLICT);
+        }
+
+        ResumeVersion version = new ResumeVersion();
+        version.setId(idWorker.nextId());
+        version.setResumeId(resumeId);
+        version.setVersionNo(nextVersion);
+        version.setParserVersion(request.parserVersion());
+        // 结构化实体抽取在 P5 完成；先落空对象保证版本链完整
+        version.setStructuredJson("{}");
+        version.setMarkdownFileId(request.markdownFileId());
+        resumeVersionMapper.insert(version);
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("resumeId", String.valueOf(resumeId));
+        payload.put("personId", String.valueOf(resume.getPersonId()));
+        payload.put("taskNo", task.getTaskNo());
+        payload.put("versionNo", nextVersion);
+        payload.put("chunkCount", request.chunkCount() == null ? 0 : request.chunkCount());
+        payload.put("markdownFileId", String.valueOf(request.markdownFileId()));
+        payload.put("parserVersion", request.parserVersion());
+        outboxService.append(EventTypes.RESUME_PARSE_COMPLETED, String.valueOf(resumeId), "RESUME", payload);
+
+        return statusView(resume, task);
+    }
+
+    /**
+     * mineru-worker 解析失败回调：更新失败/DEAD 状态并发布 {@code resume.parse.failed}。
+     * 迟到的失败回调不能覆盖已经成功的任务。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ResumeParseStatusVO markParseFailed(long resumeId, ParseFailedRequest request) {
+        Resume resume = requireResume(resumeId);
+        ResumeParseTask task = requireTask(resumeId, request.taskNo());
+        if (ParseTaskStatus.SUCCESS.equals(task.getStatus())) {
+            return statusView(resume, task);
+        }
+
+        int retryCount = task.getRetryCount() == null ? 0 : task.getRetryCount();
+        boolean dead = retryCount >= MAX_RETRY;
+        task.setStatus(dead ? ParseTaskStatus.DEAD : ParseTaskStatus.FAILED);
+        task.setErrorMsg(truncate(request.reason(), 512));
+        if (taskMapper.updateById(task) == 0) {
+            throw new BizException(ErrorCode.SYS_ERROR, "任务状态已变更，请重试");
+        }
+
+        resume.setParseStatus(ResumeStatus.FAILED);
+        if (resumeMapper.updateById(resume) == 0) {
+            throw new BizException(ErrorCode.RESUME_VERSION_CONFLICT);
+        }
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("resumeId", String.valueOf(resumeId));
+        payload.put("personId", String.valueOf(resume.getPersonId()));
+        payload.put("taskNo", task.getTaskNo());
+        payload.put("reason", truncate(request.reason(), 512));
+        payload.put("attempt", retryCount + 1);
+        outboxService.append(EventTypes.RESUME_PARSE_FAILED, String.valueOf(resumeId), "RESUME", payload);
+
+        return statusView(resume, task);
     }
 
     /**
@@ -270,7 +351,7 @@ public class ResumeService {
         }
 
         outboxService.append(EventTypes.RESUME_RECEIVED, String.valueOf(resumeId), "RESUME",
-                receivedPayload(resume));
+                receivedPayload(resume, task));
         return ParseTaskVO.from(task);
     }
 
@@ -355,6 +436,35 @@ public class ResumeService {
                 .last("LIMIT 1"));
     }
 
+    private ResumeParseTask requireTask(long resumeId, String taskNo) {
+        ResumeParseTask task = taskMapper.selectOne(Wrappers.<ResumeParseTask>lambdaQuery()
+                .eq(ResumeParseTask::getResumeId, resumeId)
+                .eq(ResumeParseTask::getTaskNo, taskNo)
+                .last("LIMIT 1"));
+        if (task == null) {
+            throw new BizException(ErrorCode.PARSE_TASK_NOT_FOUND);
+        }
+        return task;
+    }
+
+    private ResumeParseStatusVO statusView(Resume resume, ResumeParseTask task) {
+        return new ResumeParseStatusVO(
+                String.valueOf(resume.getId()),
+                task == null ? null : task.getTaskNo(),
+                resume.getParseStatus(),
+                task == null ? null : task.getStage(),
+                task == null ? null : task.getProgress(),
+                task == null ? null : task.getErrorMsg(),
+                task == null ? null : task.getRetryCount());
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
+        return value.length() <= maxLength ? value : value.substring(0, maxLength);
+    }
+
     private void validateStructuredJson(String json) {
         try {
             JsonNode node = objectMapper.readTree(json);
@@ -366,10 +476,11 @@ public class ResumeService {
         }
     }
 
-    private Map<String, Object> receivedPayload(Resume resume) {
+    private Map<String, Object> receivedPayload(Resume resume, ResumeParseTask task) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("resumeId", String.valueOf(resume.getId()));
         payload.put("personId", String.valueOf(resume.getPersonId()));
+        payload.put("taskNo", task.getTaskNo());
         payload.put("fileId", String.valueOf(resume.getFileId()));
         payload.put("fileKey", resume.getFileKey());
         payload.put("channel", resume.getChannel());

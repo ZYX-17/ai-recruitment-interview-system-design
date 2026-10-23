@@ -44,14 +44,30 @@ public class RabbitTopologyConfig {
 
     @Bean
     public Queue mineruResumeQueue(
+            @Value("${recruit.mq.mineru-resume-queue:mineru.resume-received}") String name,
+            @Qualifier("deadLetterExchange") TopicExchange dlx) {
+        return QueueBuilder.durable(name)
+                .deadLetterExchange(dlx.getName())
+                .deadLetterRoutingKey(name + ".dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue mineruResumeDlq(
             @Value("${recruit.mq.mineru-resume-queue:mineru.resume-received}") String name) {
-        return QueueBuilder.durable(name).build();
+        return QueueBuilder.durable(name + ".dlq").build();
     }
 
     @Bean
     public Binding mineruResumeBinding(@Qualifier("mineruResumeQueue") Queue queue,
                                        @Qualifier("eventsExchange") TopicExchange exchange) {
         return BindingBuilder.bind(queue).to(exchange).with(EventTypes.RESUME_RECEIVED);
+    }
+
+    @Bean
+    public Binding mineruResumeDlqBinding(@Qualifier("mineruResumeDlq") Queue queue,
+                                          @Qualifier("deadLetterExchange") TopicExchange dlx) {
+        return BindingBuilder.bind(queue).to(dlx).with(queue.getName());
     }
 
     // ==================== job.published → resume.job-published ====================

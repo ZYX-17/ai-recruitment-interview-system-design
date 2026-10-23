@@ -64,9 +64,9 @@
 - [x] 事件消费 `job.published/job.updated`（幂等 + 版本比较 + 快照 upsert）
 
 ### P3 · 解析流水线
-- [ ] mineru-worker mock/真实 MinerU
-- [ ] MinIO 下载/产物上传（经 file-service）
-- [ ] 回调/任务状态/重试/DLQ
+- [x] mineru-worker mock/真实 MinerU（`PARSER_MODE=mock|mineru`，CLI 适配）
+- [x] MinIO 下载/产物上传（经 file-service 内部接口）
+- [x] 回调/任务状态/重试/DLQ（parse-completed / parse-failed；队列 DLX）
 - [ ] PDF/Word/图片三类样例
 
 ### P4 · 分块 + Embedding + ES

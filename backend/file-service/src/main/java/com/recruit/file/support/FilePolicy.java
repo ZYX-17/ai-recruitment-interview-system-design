@@ -56,7 +56,12 @@ public final class FilePolicy {
                     "application/pdf",
                     "application/msword",
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    "application/zip"), 50 * MB)
+                    "application/zip"), 50 * MB),
+            // 解析产物（MinerU Markdown / 表格 JSON / 纯文本），由 mineru-worker 上传
+            "PARSE_ARTIFACT", new Rule(Set.of(
+                    "text/markdown",
+                    "text/plain",
+                    "application/json"), 50 * MB)
     );
 
     /** MIME → 默认扩展名（文件名没有可用扩展名时兜底）。 */
@@ -65,6 +70,9 @@ public final class FilePolicy {
             Map.entry("application/msword", "doc"),
             Map.entry("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"),
             Map.entry("application/zip", "zip"),
+            Map.entry("text/markdown", "md"),
+            Map.entry("text/plain", "txt"),
+            Map.entry("application/json", "json"),
             Map.entry("image/jpeg", "jpg"),
             Map.entry("image/png", "png"),
             Map.entry("image/webp", "webp"),

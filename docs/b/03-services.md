@@ -128,10 +128,11 @@
 
 ### 3.5 mineru-worker（Python，8002）
 
-- 消费解析任务（RabbitMQ）或接受 `POST /parse`。
-- 下载原件 → MinerU/magic-pdf → Markdown + 表格 + 公式 + 图注 → 上传 MinIO（经 file-service）。
-- 回调/事件通知 resume-service；状态、进度、重试 ≤3、失败原因。
-- 模式：`PARSER_MODE=mock|mineru`；Mock 用 PDFBox/Tika 或样例 Markdown，保证链路可跑。
+- 消费 `mineru.resume-received`（`resume.received`）或接受 `POST /parse`。
+- 经 file-service 内部接口下载原件；MinerU/magic-pdf → Markdown + 表格 + 公式 + 图注；产物上传 file-service。
+- 回调 `/internal/resumes/{id}/parse-completed|parse-failed`；resume-service 更新状态并发 `resume.parse.completed/failed`。
+- 失败置 FAILED/DEAD，消息 nack 到 `mineru.resume-received.dlq`；人工 `retry-parse`（≤3 次）再投递。
+- 模式：`PARSER_MODE=mock|mineru`；Mock 用 pypdf/python-docx 轻量抽取 + 占位内容，保证无 GPU 链路可跑。
 - 与 ai-worker 分离部署，避免 MinerU 的 torch/paddle 依赖影响 ASR 服务。
 
 ---

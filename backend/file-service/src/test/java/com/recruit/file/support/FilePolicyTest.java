@@ -51,4 +51,11 @@ class FilePolicyTest {
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
         assertEquals("bin", FilePolicy.extensionOf("blob", "application/octet-stream"));
     }
+
+    @Test
+    void acceptsMarkdownParseArtifact() {
+        assertDoesNotThrow(() -> FilePolicy.validate("PARSE_ARTIFACT", "text/markdown", 1024));
+        assertEquals("md", FilePolicy.extensionOf("resume-1.md", "text/markdown"));
+        assertEquals("md", FilePolicy.extensionOf("without-suffix", "text/markdown"));
+    }
 }
