@@ -34,6 +34,7 @@ B 已声明的队列：
 | 队列 | routingKey | 用途 |
 |---|---|---|
 | `mineru.resume-received` | `resume.received` | mineru-worker 消费解析任务 |
+| `resume.parse-completed` | `resume.parse.completed` | resume-service 分块/Embedding/ES 索引 |
 | `resume.job-published` | `job.published` | resume-service 更新 `job_snapshot` |
 | `resume.job-updated` | `job.updated` | resume-service 更新 `job_snapshot` |
 

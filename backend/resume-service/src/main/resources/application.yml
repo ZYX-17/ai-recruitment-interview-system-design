@@ -71,9 +71,19 @@ recruit:
   es:
     resume-index: resume_vec
     vector-dims: 512
+    # IK 插件未安装时自动回退 standard
+    analyzer: ${ES_ANALYZER:ik_max_word}
   # ES 挂时切 mysql-like（Nacos 开关）
   search:
     fallback-to-mysql: ${SEARCH_FALLBACK:false}
+  # ai-worker BGE embedding（不注册 Nacos，固定地址）
+  ai-worker:
+    url: ${AI_WORKER_URL:http://127.0.0.1:8001}
+  embed:
+    dims: 512
+    batch-size: ${EMBED_BATCH_SIZE:32}
+    # 开发/演示可降级本地 mock；生产建议 false
+    fallback-mock: ${EMBED_FALLBACK_MOCK:true}
   # 雪花 ID 多实例部署时 worker-id/datacenter-id 必须各不相同（0~31）
   id:
     worker-id: ${WORKER_ID:1}
@@ -93,6 +103,7 @@ recruit:
     events-exchange: ${EVENTS_EXCHANGE:recruit.events}
     dlx: ${EVENT_DLX:recruit.dlx}
     mineru-resume-queue: ${MINERU_RESUME_QUEUE:mineru.resume-received}
+    resume-parse-completed-queue: ${RESUME_PARSE_COMPLETED_QUEUE:resume.parse-completed}
     job-published-queue: ${JOB_PUBLISHED_QUEUE:resume.job-published}
     job-updated-queue: ${JOB_UPDATED_QUEUE:resume.job-updated}
   # Outbox 投递与重试

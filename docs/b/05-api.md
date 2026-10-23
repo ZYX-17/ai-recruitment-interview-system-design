@@ -100,7 +100,7 @@
 | WSS | `/api/ai/v1/asr/{sessionId}` | `scope=asr` 令牌 | 由 ai-worker 承接（Nginx rewrite） |
 | POST | `/api/ai/v1/tasks` | 内部 | 任务提交（骨架已有，补契约） |
 | GET | `/api/ai/v1/tasks/{taskNo}` | 内部/登录 | 任务状态轮询 |
-| POST | `/api/v1/embed` | 内部 | BGE 批量 embedding（ai-worker） |
+| POST | `/api/v1/embed` | 内部 | BGE 批量 embedding（ai-worker）：`{texts:[]}` → `{embeddings:[[512]],dims,model,mode}` |
 | GET/PUT | `/api/ai/prompts/**` | `ai:prompt:view/update` | Prompt 管理（P2） |
 | GET/POST | `/api/ai/tasks/**` | `ai:task:view/retry` | 任务管理（P2） |
 

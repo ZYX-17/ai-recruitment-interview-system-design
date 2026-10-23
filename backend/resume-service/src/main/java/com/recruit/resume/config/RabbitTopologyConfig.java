@@ -70,6 +70,38 @@ public class RabbitTopologyConfig {
         return BindingBuilder.bind(queue).to(dlx).with(queue.getName());
     }
 
+    // ==================== resume.parse.completed → 分块/Embedding/ES ====================
+
+    @Bean
+    public Queue resumeParseCompletedQueue(
+            @Value("${recruit.mq.resume-parse-completed-queue:resume.parse-completed}") String name,
+            @Qualifier("deadLetterExchange") TopicExchange dlx) {
+        return QueueBuilder.durable(name)
+                .deadLetterExchange(dlx.getName())
+                .deadLetterRoutingKey(name + ".dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue resumeParseCompletedDlq(
+            @Value("${recruit.mq.resume-parse-completed-queue:resume.parse-completed}") String name) {
+        return QueueBuilder.durable(name + ".dlq").build();
+    }
+
+    @Bean
+    public Binding resumeParseCompletedBinding(
+            @Qualifier("resumeParseCompletedQueue") Queue queue,
+            @Qualifier("eventsExchange") TopicExchange exchange) {
+        return BindingBuilder.bind(queue).to(exchange).with(EventTypes.RESUME_PARSE_COMPLETED);
+    }
+
+    @Bean
+    public Binding resumeParseCompletedDlqBinding(
+            @Qualifier("resumeParseCompletedDlq") Queue queue,
+            @Qualifier("deadLetterExchange") TopicExchange dlx) {
+        return BindingBuilder.bind(queue).to(dlx).with(queue.getName());
+    }
+
     // ==================== job.published → resume.job-published ====================
 
     @Bean

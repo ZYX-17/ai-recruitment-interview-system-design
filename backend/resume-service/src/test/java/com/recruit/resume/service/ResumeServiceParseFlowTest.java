@@ -71,9 +71,9 @@ class ResumeServiceParseFlowTest {
         ResumeParseStatusVO status = resumeService.markParseCompleted(1L,
                 new ParseCompletedRequest("PT1", 900L, "mock-1.0", 0));
 
-        assertEquals("SUCCESS", status.parseStatus());
+        assertEquals("STRUCTURING", status.parseStatus());
         assertEquals(100, status.progress());
-        assertEquals("SUCCESS", resume.getParseStatus());
+        assertEquals("STRUCTURING", resume.getParseStatus());
         assertEquals(900L, resume.getMarkdownFileId());
         assertEquals(1, resume.getCurrentVersionNo());
 

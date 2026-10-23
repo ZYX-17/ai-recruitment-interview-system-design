@@ -198,7 +198,8 @@ public class ResumeService {
         }
 
         resume.setMarkdownFileId(request.markdownFileId());
-        resume.setParseStatus(ResumeStatus.SUCCESS);
+        // 解析完成 ≠ 索引完成：STRUCTURING 阶段由 resume.parse.completed 消费者继续推进
+        resume.setParseStatus(ResumeStatus.STRUCTURING);
         resume.setCurrentVersionNo(nextVersion);
         if (resumeMapper.updateById(resume) == 0) {
             throw new BizException(ErrorCode.RESUME_VERSION_CONFLICT);

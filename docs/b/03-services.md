@@ -66,7 +66,10 @@
 **模块**：
 
 - `PersonService`、`ResumeService`、`ParseTaskService`、`ChunkService`、`SearchService`、`MatchService`、`DedupService`、`TagService`、`ScreeningRuleService`、`TalentService`、`PortraitService`。
-- `EsResumeIndexService`：索引初始化、bulk、混合检索、`mysql-like` 兜底。
+- `ResumeChunker`：300~500 token、表格独立成块并重复表头、标题路径前缀。
+- `EmbeddingService`：调用 ai-worker `/api/v1/embed`，批量 32；ai-worker 不可用时按开关降级本地 mock。
+- `ResumeIndexingService`：消费 `resume.parse.completed`，下载 Markdown → 分块 → embedding → ES bulk → `resume_chunk`。
+- `ResumeEsService`：`resume_vec` 索引初始化（IK 缺失回退 standard）、按 resume_id 先删后插、bulk 写入。
 - `OutboxService` / `OutboxPublisher`；`JobSnapshotConsumer` 等。
 - Feign：`AiServiceClient`、`FileServiceClient`；连接 2s/读 3s；traceId 透传。
 - 数据范围/审计：按 `ALL/DEPARTMENT/ASSIGNED/SELF` 过滤候选人/简历；候选人只能访问自己的数据；简历下载、合并、导出写审计。
@@ -81,6 +84,10 @@
 6. 前端轮询 `parse-status`。
 
 **解析阶段**：PARSE → CHUNK → EMBED → INDEX → SUCCESS；失败重试 ≤3 → DEAD；HR 可手动重试。
+
+- mineru-worker 回调成功后：`resume.parseStatus=STRUCTURING`，发 `resume.parse.completed`；
+- `ResumeIndexingService` 消费后置 `INDEXING`，完成分块/Embedding/ES 后置 `SUCCESS`；
+- 失败置 `FAILED` 并发 `resume.parse.failed`，由 `retry-parse` 重新走整条链路。
 
 ### 3.3 ai-service（Python/FastAPI，9010）
 

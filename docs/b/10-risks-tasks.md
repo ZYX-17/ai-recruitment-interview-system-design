@@ -70,10 +70,11 @@
 - [ ] PDF/Word/图片三类样例
 
 ### P4 · 分块 + Embedding + ES
-- [ ] 分块器（300~500 token、表格独立、表头重复、标题路径）
-- [ ] ai-worker `/api/v1/embed`（mock/bge）
-- [ ] ES mapping/索引初始化
-- [ ] bulk 索引、混合检索、mysql-like 兜底
+- [x] 分块器（300~500 token、表格独立、表头重复、完整标题路径）
+- [x] ai-worker `/api/v1/embed`（mock/bge，512 维）
+- [x] ES mapping/索引初始化（IK 缺失回退 standard）
+- [x] `resume.parse.completed` 消费 + bulk 索引 + `resume_chunk` 落库
+- [ ] 混合检索 BM25+kNN+RRF、mysql-like 兜底
 
 ### P5 · ai-service
 - [ ] 任务持久化/状态机

@@ -60,6 +60,21 @@ recruit/
 └── recording/...（C 的录制，B 不负责）
 ```
 
+### 4.3.1 ES 文档字段（resume_vec）
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `doc_id` | keyword | `{resumeId}-{chunkNo}` |
+| `doc_type` | keyword | `resume` / `jd` |
+| `resume_id` / `person_id` | keyword | 业务 ID（字符串） |
+| `chunk_no` | integer | 块序号 |
+| `chunk_type` | keyword | TEXT / TABLE |
+| `section_path` | text | 标题路径（IK，缺失回退 standard） |
+| `content` | text | 带标题路径前缀的块内容 |
+| `embedding` | dense_vector | 512 维，cosine，HNSW m=16/ef_construction=200 |
+| `embedding_model` | keyword | bge-small-zh-v1.5 / mock-local |
+| `updated_at` | date | 索引时间 |
+
 ### 4.4 Redis Key
 
 | Key | 用途 |

@@ -22,6 +22,23 @@ services:
     build: { context: ../backend, dockerfile: Dockerfile, args: { MODULE: resume-service } }
     container_name: recruit-resume
     ports: ["8084:8084"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      NACOS_ADDR: ${NACOS_ADDR:-host.docker.internal:8848}
+      MYSQL_HOST: ${MYSQL_HOST:-host.docker.internal}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_USER: ${MYSQL_USER:-root}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-root}
+      REDIS_HOST: ${REDIS_HOST:-host.docker.internal}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-host.docker.internal}
+      ES_URI: ${ES_URI:-http://host.docker.internal:9200}
+      EVENTS_EXCHANGE: ${EVENTS_EXCHANGE:-recruit.events}
+      FILE_SERVICE_URL: ${FILE_SERVICE_URL:-http://host.docker.internal:8087}
+      AI_WORKER_URL: ${RESUME_AI_WORKER_URL:-http://host.docker.internal:8001}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-dev-internal-token}
+      EMBED_FALLBACK_MOCK: ${EMBED_FALLBACK_MOCK:-true}
+      MQ_ENABLED: ${MQ_ENABLED:-true}
 
   room-service:
     build: { context: ../backend, dockerfile: Dockerfile, args: { MODULE: room-service } }
@@ -37,6 +54,18 @@ services:
     build: { context: ../backend, dockerfile: Dockerfile, args: { MODULE: file-service } }
     container_name: recruit-file
     ports: ["8087:8087"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      NACOS_ADDR: ${NACOS_ADDR:-host.docker.internal:8848}
+      MYSQL_HOST: ${MYSQL_HOST:-host.docker.internal}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_USER: ${MYSQL_USER:-root}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-root}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://host.docker.internal:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-dev-internal-token}
 
   frontend:
     build: { context: ../frontend, dockerfile: Dockerfile }

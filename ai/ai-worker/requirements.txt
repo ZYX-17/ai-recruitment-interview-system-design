@@ -10,4 +10,4 @@ pyjwt==2.8.0
 # ---- GPU 节点按需（不装则走 mock）----
 # funasr==1.1.x          # FunASR 流式（paraformer-zh-streaming）
 # torch==2.3.0           # CUDA 版按 GPU 节点驱动选择
-# sentence-transformers  # 或 flagembedding（BGE bge-small-zh-v1.5，512 维）
+# sentence-transformers  # BGE bge-small-zh-v1.5，512 维（EMBED_MODE=bge 时必装）
