@@ -153,6 +153,36 @@
 }
 ```
 
+响应按**简历**聚合（不是 chunk）；`score` 为 RRF 融合分，`highlights` 为命中块摘要：
+
+```json
+{
+  "list": [
+    {
+      "resumeId": "90001",
+      "resumeNo": "R90001",
+      "personId": "70001",
+      "personName": "张三",
+      "fileName": "张三-简历.pdf",
+      "city": "上海",
+      "education": "本科",
+      "workYears": 5,
+      "parseStatus": "SUCCESS",
+      "score": 0.0328,
+      "highlights": ["[工作经历/腾讯] 2019-2022 Java 开发工程师..."]
+    }
+  ],
+  "total": 1,
+  "pageNum": 1,
+  "pageSize": 20,
+  "pages": 1
+}
+```
+
+- `parseStatus` 缺省只搜 `SUCCESS`；传 `ALL` 表示不限。
+- `keyword` 为空时退化为纯过滤查询。
+- `SEARCH_MODE=mysql-like` 或 ES 异常（`SEARCH_FALLBACK=true`）时走 SQL 兜底，响应结构不变。
+
 **人岗匹配 `POST /api/resume/matches`**：
 
 ```json

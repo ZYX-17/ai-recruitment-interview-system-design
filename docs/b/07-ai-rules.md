@@ -28,10 +28,11 @@
 
 ### 7.4 混合检索
 
-- BM25：`multi_match`（content、skills^2、section_path）+ IK。
-- kNN：`embedding` topK。
-- RRF 融合；召回 top50。
-- ES 不可用 → `mysql-like`（SQL LIKE + 字段过滤），30 秒内切换。
+- BM25：`multi_match`（`content`、`section_path^2`）+ IK；当前 chunk 文档尚未单独存 skills 字段。
+- kNN：`embedding` 召回 `SEARCH_RECALL_SIZE`（默认 200）个 chunk，`numCandidates` 取 2 倍。
+- RRF 融合：`score = Σ 1/(k + rank)`，k 默认 60；按 `resume_id` 聚合取最高块分，摘要取前 2 块。
+- 应用层过滤：解析状态（默认 SUCCESS）、城市/学历/年限、技能包含匹配；分页在聚合后执行。
+- ES 不可用或 `SEARCH_MODE=mysql-like` → SQL LIKE + 字段过滤兜底，与 ES 路径共用 `ResumeSearchMatcher`。
 
 ### 7.5 人岗匹配
 
