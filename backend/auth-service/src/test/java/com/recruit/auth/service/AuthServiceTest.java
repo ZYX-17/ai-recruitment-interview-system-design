@@ -1,5 +1,6 @@
 package com.recruit.auth.service;
 
+import com.recruit.auth.dto.ChangePasswordForm;
 import com.recruit.auth.dto.LoginForm;
 import com.recruit.auth.dto.LoginResult;
 import com.recruit.auth.dto.RefreshResult;
@@ -9,6 +10,7 @@ import com.recruit.auth.mapper.IamDepartmentMapper;
 import com.recruit.auth.mapper.IamUserMapper;
 import com.recruit.auth.security.JwtClaims;
 import com.recruit.auth.security.TokenType;
+import com.recruit.auth.security.UserPrincipal;
 import com.recruit.common.exception.BizException;
 import com.recruit.common.result.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,7 +31,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -62,6 +66,8 @@ class AuthServiceTest {
     private StringRedisTemplate redisTemplate;
     @Mock
     private ValueOperations<String, String> valueOperations;
+    @Mock
+    private TokenRevocationService tokenRevocationService;
 
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(4);
     private AuthService authService;
@@ -69,7 +75,8 @@ class AuthServiceTest {
     @BeforeEach
     void setUp() {
         authService = new AuthService(userMapper, departmentMapper, permissionService, tokenService,
-                refreshSessionService, loginAttemptService, auditService, passwordEncoder, redisTemplate);
+                refreshSessionService, loginAttemptService, auditService, passwordEncoder, redisTemplate,
+                tokenRevocationService);
     }
 
     @Test
@@ -271,6 +278,108 @@ class AuthServiceTest {
         assertEquals("new-refresh", result.refreshToken());
     }
 
+    @Test
+    void logoutCurrentDeviceBlacklistsAccessAndRevokesRefreshFamily() {
+        UserPrincipal principal = principal("10001", "jti-1", 3L);
+
+        authService.logout(principal, "refresh-token", false, request("10.0.0.1", "JUnit"));
+
+        verify(tokenRevocationService).blacklist(eq("jti-1"), any());
+        verify(refreshSessionService).revoke("refresh-token");
+        verify(tokenRevocationService, never()).revokeAllSessions(10001L);
+        verify(auditService).recordQuietly(eq(10001L), eq("LOGOUT"), eq("USER"), eq("10001"),
+                eq(true), eq("10.0.0.1"), argThat(map -> Boolean.FALSE.equals(map.get("allDevices"))));
+    }
+
+    @Test
+    void logoutAllDevicesBumpsTokenVersionAndSkipsSingleFamilyRevoke() {
+        UserPrincipal principal = principal("10001", "jti-1", 3L);
+
+        authService.logout(principal, "refresh-token", true, request("10.0.0.1", "JUnit"));
+
+        verify(tokenRevocationService).revokeAllSessions(10001L);
+        verify(refreshSessionService, never()).revoke(anyString());
+        verify(auditService).recordQuietly(eq(10001L), eq("LOGOUT"), eq("USER"), eq("10001"),
+                eq(true), eq("10.0.0.1"), argThat(map -> Boolean.TRUE.equals(map.get("allDevices"))));
+    }
+
+    @Test
+    void logoutWithoutPrincipalOrCookieIsIdempotent() {
+        authService.logout(null, null, false, request("10.0.0.1", "JUnit"));
+
+        verifyNoInteractions(tokenRevocationService, refreshSessionService);
+        verify(auditService).recordQuietly(isNull(), eq("LOGOUT"), eq("USER"), isNull(),
+                eq(true), eq("10.0.0.1"), anyMap());
+    }
+
+    @Test
+    void logoutAllDevicesFallsBackToRefreshTokenUser() {
+        when(tokenService.parseRefreshToken("refresh-token")).thenReturn(refreshClaims());
+
+        authService.logout(null, "refresh-token", true, request("10.0.0.1", "JUnit"));
+
+        verify(tokenRevocationService).revokeAllSessions(10001L);
+        verify(refreshSessionService, never()).revoke(anyString());
+    }
+
+    @Test
+    void changePasswordUpdatesHashAndRevokesAllSessions() {
+        IamUser user = activeUser("old-secret");
+        when(userMapper.selectById(10001L)).thenReturn(user);
+        when(userMapper.updatePasswordHash(eq(10001L), anyString())).thenReturn(1);
+
+        authService.changePassword(10001L, passwordForm("old-secret", "new-secret-123"),
+                request("10.0.0.1", "JUnit"));
+
+        verify(userMapper).updatePasswordHash(eq(10001L), argThat(hash -> passwordEncoder.matches("new-secret-123", hash)));
+        verify(tokenRevocationService).revokeAllSessions(10001L);
+        verify(auditService).recordQuietly(eq(10001L), eq("PASSWORD_CHANGE"), eq("USER"), eq("10001"),
+                eq(true), eq("10.0.0.1"), argThat(map -> "OK".equals(map.get("reason"))));
+    }
+
+    @Test
+    void changePasswordRejectsWrongOldPassword() {
+        IamUser user = activeUser("old-secret");
+        when(userMapper.selectById(10001L)).thenReturn(user);
+
+        BizException exception = assertThrows(BizException.class,
+                () -> authService.changePassword(10001L, passwordForm("wrong", "new-secret-123"),
+                        request("10.0.0.1", "JUnit")));
+
+        assertEquals(ErrorCode.AUTH_PASSWORD_MISMATCH, exception.getErrorCode());
+        verify(userMapper, never()).updatePasswordHash(any(), anyString());
+        verifyNoInteractions(tokenRevocationService);
+    }
+
+    @Test
+    void changePasswordRejectsSameAsOld() {
+        IamUser user = activeUser("old-secret");
+        when(userMapper.selectById(10001L)).thenReturn(user);
+
+        BizException exception = assertThrows(BizException.class,
+                () -> authService.changePassword(10001L, passwordForm("old-secret", "old-secret"),
+                        request("10.0.0.1", "JUnit")));
+
+        assertEquals(ErrorCode.PARAM_INVALID, exception.getErrorCode());
+        verify(userMapper, never()).updatePasswordHash(any(), anyString());
+        verifyNoInteractions(tokenRevocationService);
+    }
+
+    @Test
+    void changePasswordRejectsDisabledUser() {
+        IamUser user = activeUser("old-secret");
+        user.setStatus("DISABLED");
+        when(userMapper.selectById(10001L)).thenReturn(user);
+
+        BizException exception = assertThrows(BizException.class,
+                () -> authService.changePassword(10001L, passwordForm("old-secret", "new-secret-123"),
+                        request("10.0.0.1", "JUnit")));
+
+        assertEquals(ErrorCode.AUTH_FORBIDDEN, exception.getErrorCode());
+        verify(userMapper, never()).updatePasswordHash(any(), anyString());
+        verifyNoInteractions(tokenRevocationService);
+    }
+
     private IamUser activeUser(String rawPassword) {
         IamUser user = new IamUser();
         user.setId(10001L);
@@ -287,6 +396,19 @@ class AuthServiceTest {
         Instant now = Instant.now();
         return new JwtClaims("10001", "hr01", List.of("RECRUITER"), 3L, "jti-old",
                 TokenType.REFRESH, "family-1", now, now.plusSeconds(604800));
+    }
+
+    private static UserPrincipal principal(String userId, String jti, long tokenVersion) {
+        Instant now = Instant.now();
+        return UserPrincipal.from(new JwtClaims(userId, "hr01", List.of("RECRUITER"), tokenVersion, jti,
+                TokenType.ACCESS, null, now, now.plusSeconds(600)));
+    }
+
+    private static ChangePasswordForm passwordForm(String oldPassword, String newPassword) {
+        ChangePasswordForm form = new ChangePasswordForm();
+        form.setOldPassword(oldPassword);
+        form.setNewPassword(newPassword);
+        return form;
     }
 
     private static LoginForm form(String username, String password, String userType) {

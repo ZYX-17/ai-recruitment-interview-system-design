@@ -1,5 +1,6 @@
 package com.recruit.auth.security;
 
+import com.recruit.auth.service.TokenRevocationService;
 import com.recruit.auth.support.ApiErrorWriter;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -24,8 +25,8 @@ import java.io.IOException;
  * {@link RestAuthenticationEntryPoint} 统一输出 401——这样白名单接口
  * 即使带了过期令牌也能正常访问，受保护接口仍然 fail-closed。</p>
  *
- * <p>令牌版本 {@code tv} 与黑名单校验不在本过滤器：网关 P3-1 负责对业务流量比对
- * Redis {@code auth:tv:{userId}}，P1-5 负责登出/改密后的失效。</p>
+ * <p>验签通过后还要查 Redis：黑名单 {@code auth:bl:{jti}} 与版本 {@code auth:tv:{userId}}。
+ * Redis 不可用时按 fail-closed 拒绝，避免登出/改密后的旧令牌复活；网关 P3-1 对业务流量做同样校验。</p>
  */
 @Slf4j
 @Component
@@ -40,6 +41,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider tokenProvider;
     private final ApiErrorWriter apiErrorWriter;
+    private final TokenRevocationService tokenRevocationService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -53,6 +55,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = header.substring(BEARER_PREFIX.length()).trim();
         try {
             JwtClaims claims = tokenProvider.parseAccessToken(token);
+            if (!tokenRevocationService.isAccessTokenActive(claims)) {
+                throw new IllegalArgumentException("令牌已失效");
+            }
             UserPrincipal principal = UserPrincipal.from(claims);
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());

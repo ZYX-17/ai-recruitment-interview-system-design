@@ -100,13 +100,13 @@ public class RefreshSessionService {
             throw new BizException(ErrorCode.AUTH_REFRESH_INVALID);
         }
 
-        String familyKey = RedisKeys.AUTH_REFRESH_FAMILY + familyId;
+        String familyKey = RedisKeys.authRefreshFamily(familyId);
         if (!Boolean.TRUE.equals(redisTemplate.hasKey(familyKey))) {
             throw new BizException(ErrorCode.AUTH_REFRESH_INVALID);
         }
 
         String tokenHash = TokenHash.sha256(oldToken);
-        String payload = redisTemplate.opsForValue().getAndDelete(RedisKeys.AUTH_REFRESH + tokenHash);
+        String payload = redisTemplate.opsForValue().getAndDelete(RedisKeys.authRefresh(tokenHash));
         if (payload == null) {
             // 旧 token 已被消费仍再次出现：family 还在，判定重放，整族撤销
             revokeFamily(familyId, STATUS_REPLAYED);
@@ -133,6 +133,28 @@ public class RefreshSessionService {
     }
 
     /**
+     * 撤销单个 Refresh Token 所属的 family（当前设备登出）。
+     *
+     * <p>解析失败视为令牌已失效，直接返回，保证登出幂等；不会把无效 Cookie 变成 500。</p>
+     *
+     * @param refreshToken Refresh Token 原文
+     */
+    @Transactional
+    public void revoke(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return;
+        }
+        JwtClaims claims;
+        try {
+            claims = tokenService.parseRefreshToken(refreshToken);
+        } catch (RuntimeException e) {
+            return;
+        }
+        redisTemplate.delete(RedisKeys.authRefresh(TokenHash.sha256(refreshToken)));
+        revokeFamily(claims.familyId(), STATUS_REVOKED);
+    }
+
+    /**
      * 撤销整个令牌族（重放、登出、禁用）。
      *
      * @param familyId 令牌族
@@ -143,7 +165,7 @@ public class RefreshSessionService {
         if (familyId == null || familyId.isBlank()) {
             return;
         }
-        redisTemplate.delete(RedisKeys.AUTH_REFRESH_FAMILY + familyId);
+        redisTemplate.delete(RedisKeys.authRefreshFamily(familyId));
         refreshSessionMapper.updateStatusByFamilyId(familyId, status, LocalDateTime.now(ZoneOffset.UTC));
     }
 
@@ -161,9 +183,9 @@ public class RefreshSessionService {
         session.put("familyId", familyId);
         session.put("jti", claims.jti());
         session.put("status", STATUS_ACTIVE);
-        redisTemplate.opsForValue().set(RedisKeys.AUTH_REFRESH + tokenHash, toJson(session), ttl);
+        redisTemplate.opsForValue().set(RedisKeys.authRefresh(tokenHash), toJson(session), ttl);
 
-        String familyKey = RedisKeys.AUTH_REFRESH_FAMILY + familyId;
+        String familyKey = RedisKeys.authRefreshFamily(familyId);
         redisTemplate.opsForSet().add(familyKey, claims.jti());
         redisTemplate.expire(familyKey, ttl);
 

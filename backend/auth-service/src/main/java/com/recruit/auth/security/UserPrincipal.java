@@ -4,6 +4,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -24,15 +25,17 @@ public final class UserPrincipal implements UserDetails {
     private final List<String> roles;
     private final long tokenVersion;
     private final String jti;
+    private final Instant expiresAt;
     private final List<GrantedAuthority> authorities;
 
     private UserPrincipal(String userId, String username, List<String> roles,
-                          long tokenVersion, String jti) {
+                          long tokenVersion, String jti, Instant expiresAt) {
         this.userId = userId;
         this.username = username;
         this.roles = roles == null ? List.of() : List.copyOf(roles);
         this.tokenVersion = tokenVersion;
         this.jti = jti;
+        this.expiresAt = expiresAt;
         this.authorities = this.roles.stream()
                 .map(role -> role.startsWith(ROLE_PREFIX) ? role : ROLE_PREFIX + role)
                 .map(SimpleGrantedAuthority::new)
@@ -48,7 +51,7 @@ public final class UserPrincipal implements UserDetails {
      */
     public static UserPrincipal from(JwtClaims claims) {
         return new UserPrincipal(claims.userId(), claims.username(), claims.roles(),
-                claims.tokenVersion(), claims.jti());
+                claims.tokenVersion(), claims.jti(), claims.expiresAt());
     }
 
     /** 用户 ID（JWT 的 {@code uid}）。 */
@@ -69,6 +72,11 @@ public final class UserPrincipal implements UserDetails {
     /** 令牌唯一 ID，供黑名单使用。 */
     public String getJti() {
         return jti;
+    }
+
+    /** Access Token 过期时间，登出时用于计算黑名单 TTL。 */
+    public Instant getExpiresAt() {
+        return expiresAt;
     }
 
     @Override

@@ -2,11 +2,15 @@ package com.recruit.auth.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.recruit.auth.config.JwtProperties;
+import com.recruit.auth.service.TokenRevocationService;
 import com.recruit.auth.support.ApiErrorWriter;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -22,13 +26,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 /**
  * {@link JwtAuthenticationFilter} 的单元测试：不启动 Spring 容器，直接驱动过滤器。
  */
+@ExtendWith(MockitoExtension.class)
 class JwtAuthenticationFilterTest {
 
     private static KeyPair keys;
+
+    @Mock
+    private TokenRevocationService tokenRevocationService;
 
     private JwtTokenProvider provider;
     private JwtAuthenticationFilter filter;
@@ -49,7 +59,7 @@ class JwtAuthenticationFilterTest {
         properties.setRefreshTokenTtlDays(7);
         properties.setClockSkewSeconds(30);
         provider = new JwtTokenProvider(properties, keys.getPrivate(), Map.of("k1", keys.getPublic()));
-        filter = new JwtAuthenticationFilter(provider, new ApiErrorWriter(new ObjectMapper()));
+        filter = new JwtAuthenticationFilter(provider, new ApiErrorWriter(new ObjectMapper()), tokenRevocationService);
         SecurityContextHolder.clearContext();
     }
 
@@ -60,6 +70,7 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void accessTokenPopulatesSecurityContext() throws Exception {
+        when(tokenRevocationService.isAccessTokenActive(any())).thenReturn(true);
         String token = provider.createAccessToken("10001", "hr01", List.of("HR_ADMIN"), 3L);
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/auth/me");
         request.addHeader("Authorization", "Bearer " + token);
@@ -95,6 +106,19 @@ class JwtAuthenticationFilterTest {
     void malformedTokenLeavesContextEmptyButKeepsRequestAttribute() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/auth/me");
         request.addHeader("Authorization", "Bearer not-a-jwt");
+
+        filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
+
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        assertNotNull(request.getAttribute(JwtAuthenticationFilter.AUTH_ERROR_ATTRIBUTE));
+    }
+
+    @Test
+    void revokedTokenLeavesContextEmpty() throws Exception {
+        when(tokenRevocationService.isAccessTokenActive(any())).thenReturn(false);
+        String token = provider.createAccessToken("10001", "hr01", List.of("HR_ADMIN"), 3L);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/auth/me");
+        request.addHeader("Authorization", "Bearer " + token);
 
         filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
 

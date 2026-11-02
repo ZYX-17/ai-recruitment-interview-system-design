@@ -1,10 +1,13 @@
 package com.recruit.auth.controller;
 
 import com.recruit.auth.config.SecurityProperties;
+import com.recruit.auth.dto.ChangePasswordForm;
 import com.recruit.auth.dto.LoginForm;
+import com.recruit.auth.dto.LogoutForm;
 import com.recruit.auth.dto.LoginResult;
 import com.recruit.auth.dto.RefreshForm;
 import com.recruit.auth.dto.RefreshResult;
+import com.recruit.auth.security.UserPrincipal;
 import com.recruit.auth.service.AuthService;
 import com.recruit.auth.service.TokenService;
 import com.recruit.auth.support.RefreshCookieFactory;
@@ -17,7 +20,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -91,6 +96,54 @@ public class AuthController {
             }
             throw e;
         }
+    }
+
+    /**
+     * 登出（A-04）。
+     *
+     * <p>body 可省略；幂等，重复调用不会因为 Access 已进黑名单而失败。无论服务端是否找到
+     * Refresh Cookie，都下发清除 Cookie，避免浏览器保留失效令牌。</p>
+     *
+     * @param form     登出入参
+     * @param principal 当前登录主体，可为 null
+     * @param request  HTTP 请求
+     * @param response HTTP 响应
+     * @return 统一响应
+     */
+    @PostMapping("/logout")
+    public Result<Void> logout(@RequestBody(required = false) LogoutForm form,
+                               @AuthenticationPrincipal UserPrincipal principal,
+                               HttpServletRequest request,
+                               HttpServletResponse response) {
+        boolean allDevices = form != null && Boolean.TRUE.equals(form.getAllDevices());
+        authService.logout(principal, readRefreshCookie(request), allDevices, request);
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookieFactory.clear().toString());
+        return Result.ok();
+    }
+
+    /**
+     * 自助改密（P1-5）。
+     *
+     * <p>成功后 token_version 递增、全部 Refresh 会话撤销，前端必须重新登录；
+     * 这里同时清除 Refresh Cookie，避免继续携带失效令牌。</p>
+     *
+     * @param form      改密入参
+     * @param principal 当前登录主体
+     * @param request   HTTP 请求
+     * @param response  HTTP 响应
+     * @return 统一响应
+     */
+    @PutMapping("/password")
+    public Result<Void> changePassword(@Valid @RequestBody ChangePasswordForm form,
+                                       @AuthenticationPrincipal UserPrincipal principal,
+                                       HttpServletRequest request,
+                                       HttpServletResponse response) {
+        if (principal == null) {
+            throw new BizException(ErrorCode.GW_UNAUTHENTICATED);
+        }
+        authService.changePassword(Long.parseLong(principal.getUserId()), form, request);
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookieFactory.clear().toString());
+        return Result.ok();
     }
 
     private String readRefreshCookie(HttpServletRequest request) {

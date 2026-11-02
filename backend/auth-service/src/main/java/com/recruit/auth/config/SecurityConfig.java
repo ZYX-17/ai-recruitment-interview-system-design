@@ -40,6 +40,7 @@ public class SecurityConfig {
             "/api/auth/login",
             "/api/auth/register",
             "/api/auth/refresh",
+            "/api/auth/logout", // 幂等：重复登出/令牌已进黑名单时仍返回成功
             "/api/auth/ping",
             "/actuator/health",
             "/actuator/health/**",

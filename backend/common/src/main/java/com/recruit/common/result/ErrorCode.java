@@ -51,6 +51,7 @@ public enum ErrorCode {
     AUTH_LOGIN_FAILED("AUTH1001", "用户名或密码错误", 401),
     AUTH_REFRESH_INVALID("AUTH1002", "Refresh Token 无效或已过期", 401),
     AUTH_REFRESH_REPLAYED("AUTH1003", "令牌重放，请重新登录", 401),
+    AUTH_PASSWORD_MISMATCH("AUTH1004", "原密码不正确", 400),
     AUTH_FORBIDDEN("AUTH1101", "权限不足", 403),
 
     // RSM2xxx 简历/人才

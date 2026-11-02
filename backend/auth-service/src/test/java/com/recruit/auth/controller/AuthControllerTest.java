@@ -1,11 +1,16 @@
 package com.recruit.auth.controller;
 
 import com.recruit.auth.config.SecurityProperties;
+import com.recruit.auth.dto.ChangePasswordForm;
 import com.recruit.auth.dto.LoginForm;
 import com.recruit.auth.dto.LoginResult;
+import com.recruit.auth.dto.LogoutForm;
 import com.recruit.auth.dto.RefreshForm;
 import com.recruit.auth.dto.RefreshResult;
 import com.recruit.auth.dto.UserSummary;
+import com.recruit.auth.security.JwtClaims;
+import com.recruit.auth.security.TokenType;
+import com.recruit.auth.security.UserPrincipal;
 import com.recruit.auth.service.AuthService;
 import com.recruit.auth.service.TokenService;
 import com.recruit.auth.support.RefreshCookieFactory;
@@ -25,6 +30,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -158,6 +164,70 @@ class AuthControllerTest {
         controller.refresh(refreshForm("body-token"), new MockHttpServletRequest(), new MockHttpServletResponse());
 
         verify(authService).refresh(eq("body-token"), any());
+    }
+
+    @Test
+    void logoutClearsRefreshCookieAndPassesAllDevicesFlag() {
+        LogoutForm form = new LogoutForm();
+        form.setAllDevices(Boolean.TRUE);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        UserPrincipal principal = principal();
+
+        Result<Void> body = controller.logout(form, principal, new MockHttpServletRequest(), response);
+
+        assertTrue(body.isSuccess());
+        verify(authService).logout(eq(principal), isNull(), eq(true), any());
+        String setCookie = response.getHeader(HttpHeaders.SET_COOKIE);
+        assertNotNull(setCookie);
+        assertTrue(setCookie.contains("Max-Age=0"));
+    }
+
+    @Test
+    void logoutWithoutBodyDefaultsToCurrentDevice() {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        UserPrincipal principal = principal();
+
+        controller.logout(null, principal, requestWithCookie("refresh-token"), response);
+
+        verify(authService).logout(eq(principal), eq("refresh-token"), eq(false), any());
+        assertNotNull(response.getHeader(HttpHeaders.SET_COOKIE));
+    }
+
+    @Test
+    void changePasswordClearsRefreshCookie() {
+        ChangePasswordForm form = new ChangePasswordForm();
+        form.setOldPassword("old-secret");
+        form.setNewPassword("new-secret-123");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockHttpServletRequest request = new MockHttpServletRequest("PUT", "/api/auth/password");
+
+        Result<Void> body = controller.changePassword(form, principal(), request, response);
+
+        assertTrue(body.isSuccess());
+        verify(authService).changePassword(10001L, form, request);
+        String setCookie = response.getHeader(HttpHeaders.SET_COOKIE);
+        assertNotNull(setCookie);
+        assertTrue(setCookie.contains("Max-Age=0"));
+    }
+
+    @Test
+    void changePasswordWithoutPrincipalReturnsUnauthenticated() {
+        ChangePasswordForm form = new ChangePasswordForm();
+        form.setOldPassword("old-secret");
+        form.setNewPassword("new-secret-123");
+
+        BizException exception = assertThrows(BizException.class,
+                () -> controller.changePassword(form, null, new MockHttpServletRequest(), new MockHttpServletResponse()));
+
+        org.junit.jupiter.api.Assertions.assertEquals(ErrorCode.GW_UNAUTHENTICATED, exception.getErrorCode());
+        verify(authService, org.mockito.Mockito.never()).changePassword(org.mockito.ArgumentMatchers.anyLong(),
+                any(), any());
+    }
+
+    private static UserPrincipal principal() {
+        Instant now = Instant.now();
+        return UserPrincipal.from(new JwtClaims("10001", "hr01", List.of("RECRUITER"), 3L, "jti-1",
+                TokenType.ACCESS, null, now, now.plusSeconds(600)));
     }
 
     private static LoginResult result(String refreshToken) {

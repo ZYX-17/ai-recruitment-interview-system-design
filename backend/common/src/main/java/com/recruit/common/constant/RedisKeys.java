@@ -114,6 +114,36 @@ public final class RedisKeys {
     }
 
     /**
+     * 构造刷新会话 Key。
+     *
+     * @param tokenHash sha256(Refresh Token)
+     * @return auth:refresh:{tokenHash}
+     */
+    public static String authRefresh(String tokenHash) {
+        return AUTH_REFRESH + requireSegment(tokenHash, "tokenHash");
+    }
+
+    /**
+     * 构造令牌族 Key。
+     *
+     * @param familyId 令牌族 ID
+     * @return auth:refresh:family:{familyId}
+     */
+    public static String authRefreshFamily(String familyId) {
+        return AUTH_REFRESH_FAMILY + requireSegment(familyId, "familyId");
+    }
+
+    /**
+     * 构造 Access 黑名单 Key。
+     *
+     * @param jti 令牌唯一 ID
+     * @return auth:bl:{jti}
+     */
+    public static String authBlacklist(String jti) {
+        return AUTH_BLACKLIST + requireSegment(jti, "jti");
+    }
+
+    /**
      * 构造登录失败计数 Key。
      *
      * @param username 登录名（内部转小写；允许冒号，避免异常用户名变成 500）

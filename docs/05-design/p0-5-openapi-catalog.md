@@ -64,7 +64,7 @@ W1 冻结的是 **operation 清单**（method + path + operationId + 权限码 +
 
 | Tag | operation 数 |
 |---|---:|
-| auth | 6 |
+| auth | 7 |
 | admin | 29 |
 | interview-job（含流程模板） | 12 |
 | interview-application | 5 |
@@ -76,7 +76,7 @@ W1 冻结的是 **operation 清单**（method + path + operationId + 权限码 +
 | interview-stats | 3 |
 | portal | 12 |
 | notify | 5 |
-| **合计** | **105** |
+| **合计** | **106** |
 
 ## 4. auth（tag: auth）
 
@@ -86,6 +86,7 @@ W1 冻结的是 **operation 清单**（method + path + operationId + 权限码 +
 | `auth_register` | POST | `/api/auth/register` | 公开 | Idempotency-Key | — |
 | `auth_refresh` | POST | `/api/auth/refresh` | 公开（Refresh Cookie） | — | `AUTH1002`、`AUTH1003` |
 | `auth_logout` | POST | `/api/auth/logout` | 登录 | 幂等 | — |
+| `auth_password_change` | PUT | `/api/auth/password` | 登录 | — | `AUTH1004` |
 | `auth_me` | GET | `/api/auth/me` | 登录 | — | — |
 | `auth_menus` | GET | `/api/auth/menus` | 登录 | — | — |
 
@@ -270,7 +271,7 @@ W1 冻结的是 **operation 清单**（method + path + operationId + 权限码 +
 
 ## 17. 冻结清单（W1 评审）
 
-- [x] `operationId` 全量唯一（105 个）
+- [x] `operationId` 全量唯一（106 个）
 - [x] 每个非公开 operation 均登记权限码
 - [x] 每个写操作标注 `Idempotency-Key`，每个更新标注 `version`
 - [x] 每个 operation 有「成功 + 400/403/409」示例要求
@@ -283,11 +284,11 @@ W1 冻结的是 **operation 清单**（method + path + operationId + 权限码 +
 
 | 文档端点组 | 本文 operation 数 | 说明 |
 |---|---:|---|
-| auth 15 组 | 35 | 6 个会话接口 + 29 个管理端接口（GET/POST/PUT/DELETE 拆分） |
+| auth 15 组 | 36 | 7 个会话接口（P1-5 增补自助改密）+ 29 个管理端接口（GET/POST/PUT/DELETE 拆分） |
 | interview 22 组 | 53 | I-22 子表（Offer/异步/统计）展开 |
 | notify 4 组 | 5 | 拆分模板列表/更新、增加重发 |
 | portal（附录 C） | 12 | 门户端点独立成 tag |
-| **合计** | **105** | 41 是任务分解口径，不是 operation 上限（§1.5） |
+| **合计** | **106** | 41 是任务分解口径，不是 operation 上限（§1.5） |
 
 ## 19. 变更流程
 

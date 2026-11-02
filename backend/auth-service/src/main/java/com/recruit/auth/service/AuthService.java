@@ -1,5 +1,6 @@
 package com.recruit.auth.service;
 
+import com.recruit.auth.dto.ChangePasswordForm;
 import com.recruit.auth.dto.LoginForm;
 import com.recruit.auth.dto.LoginResult;
 import com.recruit.auth.dto.RefreshResult;
@@ -9,6 +10,7 @@ import com.recruit.auth.entity.IamUser;
 import com.recruit.auth.mapper.IamDepartmentMapper;
 import com.recruit.auth.mapper.IamUserMapper;
 import com.recruit.auth.security.JwtClaims;
+import com.recruit.auth.security.UserPrincipal;
 import com.recruit.auth.support.IpUtil;
 import com.recruit.common.constant.RedisKeys;
 import com.recruit.common.exception.BizException;
@@ -19,13 +21,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 登录编排（A-01）。
+ * 认证编排：登录（A-01）、登出（A-04）、自助改密（P1-5）。
  *
  * <p>安全口径：</p>
  * <ul>
@@ -41,6 +44,8 @@ public class AuthService {
 
     private static final String STATUS_ACTIVE = "ACTIVE";
     private static final String ACTION_LOGIN = "LOGIN";
+    private static final String ACTION_LOGOUT = "LOGOUT";
+    private static final String ACTION_CHANGE_PASSWORD = "PASSWORD_CHANGE";
     private static final String RESOURCE_USER = "USER";
 
     /**
@@ -59,6 +64,7 @@ public class AuthService {
     private final AuditService auditService;
     private final PasswordEncoder passwordEncoder;
     private final StringRedisTemplate redisTemplate;
+    private final TokenRevocationService tokenRevocationService;
 
     /**
      * 登录。
@@ -171,6 +177,109 @@ public class AuthService {
 
         String accessToken = tokenService.createAccessToken(user, roles, tokenVersion);
         return new RefreshResult(accessToken, "Bearer", tokenService.accessTtlSeconds(), issued.token());
+    }
+
+    /**
+     * 登出（A-04）。
+     *
+     * <p>幂等：令牌已失效、Cookie 缺失或已撤销都返回成功，不把重复登出变成 401。
+     * 当前设备登出撤销 Refresh Cookie 所属 family；{@code allDevices=true} 递增
+     * token_version 并撤销该用户全部 Refresh 会话。</p>
+     *
+     * @param principal    当前登录主体，可为 null（logout 端点白名单放行以便幂等）
+     * @param refreshToken Refresh Cookie 原文，可为 null
+     * @param allDevices   是否全端登出
+     * @param request      HTTP 请求（取 IP）
+     */
+    public void logout(UserPrincipal principal, String refreshToken, boolean allDevices,
+                       HttpServletRequest request) {
+        String userId = principal == null ? null : principal.getUserId();
+        if (allDevices && userId == null && hasText(refreshToken)) {
+            userId = refreshUserId(refreshToken);
+        }
+
+        if (principal != null) {
+            tokenRevocationService.blacklist(principal.getJti(), principal.getExpiresAt());
+        }
+        Long operatorId = parseUserId(userId);
+        if (allDevices && operatorId != null) {
+            tokenRevocationService.revokeAllSessions(operatorId);
+        } else if (hasText(refreshToken)) {
+            refreshSessionService.revoke(refreshToken);
+        }
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("allDevices", allDevices);
+        auditService.recordQuietly(operatorId, ACTION_LOGOUT, RESOURCE_USER, userId, true,
+                IpUtil.clientIp(request), detail);
+    }
+
+    /**
+     * 自助改密（P1-5）。
+     *
+     * <p>校验原密码 → 更新 BCrypt 哈希 → 递增 token_version 并撤销全部会话。
+     * 事务覆盖密码更新与会话撤销，避免出现“密码已改但旧会话仍有效”的中间态。</p>
+     *
+     * @param userId  当前用户 ID
+     * @param form    改密入参
+     * @param request HTTP 请求（取 IP）
+     */
+    @Transactional
+    public void changePassword(long userId, ChangePasswordForm form, HttpServletRequest request) {
+        IamUser user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BizException(ErrorCode.RESOURCE_NOT_FOUND, "用户不存在");
+        }
+        String resourceId = String.valueOf(userId);
+        if (!STATUS_ACTIVE.equals(user.getStatus())) {
+            auditChangePassword(user.getId(), resourceId, false, request, "STATUS_" + safeStatus(user.getStatus()));
+            throw new BizException(ErrorCode.AUTH_FORBIDDEN, "账号已禁用或锁定，请联系管理员");
+        }
+
+        String currentHash = hasText(user.getPasswordHash()) ? user.getPasswordHash() : DUMMY_HASH;
+        if (!hasText(user.getPasswordHash())
+                || !passwordEncoder.matches(form.getOldPassword(), currentHash)) {
+            auditChangePassword(user.getId(), resourceId, false, request, "OLD_PASSWORD_MISMATCH");
+            throw new BizException(ErrorCode.AUTH_PASSWORD_MISMATCH);
+        }
+        if (passwordEncoder.matches(form.getNewPassword(), currentHash)) {
+            auditChangePassword(user.getId(), resourceId, false, request, "SAME_AS_OLD");
+            throw new BizException(ErrorCode.PARAM_INVALID, "新密码不能与原密码相同");
+        }
+
+        int updated = userMapper.updatePasswordHash(userId, passwordEncoder.encode(form.getNewPassword()));
+        if (updated == 0) {
+            throw new BizException(ErrorCode.RESOURCE_NOT_FOUND, "用户不存在");
+        }
+        tokenRevocationService.revokeAllSessions(userId);
+        auditChangePassword(user.getId(), resourceId, true, request, "OK");
+    }
+
+    private void auditChangePassword(Long operatorId, String resourceId, boolean success,
+                                     HttpServletRequest request, String reason) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("reason", reason);
+        auditService.recordQuietly(operatorId, ACTION_CHANGE_PASSWORD, RESOURCE_USER, resourceId,
+                success, IpUtil.clientIp(request), detail);
+    }
+
+    private String refreshUserId(String refreshToken) {
+        try {
+            return tokenService.parseRefreshToken(refreshToken).userId();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static Long parseUserId(String userId) {
+        if (!hasText(userId)) {
+            return null;
+        }
+        try {
+            return Long.parseLong(userId);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private UserSummary toSummary(IamUser user) {
