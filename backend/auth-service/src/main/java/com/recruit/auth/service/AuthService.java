@@ -2,15 +2,18 @@ package com.recruit.auth.service;
 
 import com.recruit.auth.dto.LoginForm;
 import com.recruit.auth.dto.LoginResult;
+import com.recruit.auth.dto.RefreshResult;
 import com.recruit.auth.dto.UserSummary;
 import com.recruit.auth.entity.IamDepartment;
 import com.recruit.auth.entity.IamUser;
 import com.recruit.auth.mapper.IamDepartmentMapper;
 import com.recruit.auth.mapper.IamUserMapper;
+import com.recruit.auth.security.JwtClaims;
 import com.recruit.auth.support.IpUtil;
 import com.recruit.common.constant.RedisKeys;
 import com.recruit.common.exception.BizException;
 import com.recruit.common.result.ErrorCode;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -124,6 +127,50 @@ public class AuthService {
 
         return new LoginResult(accessToken, "Bearer", tokenService.accessTtlSeconds(), refresh.token(),
                 toSummary(user), roles, permissions, tokenVersion);
+    }
+
+    /**
+     * 刷新 Access Token（A-03）。
+     *
+     * <p>验签、类型、family 存在性、Redis 与 DB 的 token_version、GETDEL 原子消费
+     * 都在 {@link RefreshSessionService#rotate} 内完成；这里只负责取用户与组装响应。</p>
+     *
+     * @param refreshToken Refresh Token（Cookie 或 local body）
+     * @param request      HTTP 请求（取 IP / User-Agent）
+     * @return 新 Access Token 与新 Refresh Token
+     */
+    public RefreshResult refresh(String refreshToken, HttpServletRequest request) {
+        if (!hasText(refreshToken)) {
+            throw new BizException(ErrorCode.AUTH_REFRESH_INVALID);
+        }
+
+        JwtClaims claims;
+        try {
+            claims = tokenService.parseRefreshToken(refreshToken);
+        } catch (JwtException | IllegalArgumentException e) {
+            throw new BizException(ErrorCode.AUTH_REFRESH_INVALID);
+        }
+
+        long userId;
+        try {
+            userId = Long.parseLong(claims.userId());
+        } catch (NumberFormatException e) {
+            throw new BizException(ErrorCode.AUTH_REFRESH_INVALID);
+        }
+
+        IamUser user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BizException(ErrorCode.AUTH_REFRESH_INVALID);
+        }
+
+        List<String> roles = permissionService.roleCodes(userId);
+        long tokenVersion = user.getTokenVersion() == null ? 0L : user.getTokenVersion();
+        RefreshSessionService.IssuedRefresh issued = refreshSessionService.rotate(
+                refreshToken, claims, user, roles, tokenVersion,
+                IpUtil.clientIp(request), request.getHeader("User-Agent"));
+
+        String accessToken = tokenService.createAccessToken(user, roles, tokenVersion);
+        return new RefreshResult(accessToken, "Bearer", tokenService.accessTtlSeconds(), issued.token());
     }
 
     private UserSummary toSummary(IamUser user) {

@@ -27,13 +27,28 @@ public class RefreshCookieFactory {
      * @return Set-Cookie 值
      */
     public ResponseCookie create(String token, long ttlSeconds) {
+        return base(token)
+                .maxAge(Duration.ofSeconds(ttlSeconds))
+                .build();
+    }
+
+    /**
+     * 生成清除 Cookie 头（刷新失败/重放时下发，避免前端反复带坏 token）。
+     *
+     * @return Set-Cookie 值
+     */
+    public ResponseCookie clear() {
+        return base("")
+                .maxAge(Duration.ZERO)
+                .build();
+    }
+
+    private ResponseCookie.ResponseCookieBuilder base(String value) {
         SecurityProperties.RefreshCookie cookie = properties.getRefreshCookie();
-        return ResponseCookie.from(cookie.getName(), token)
+        return ResponseCookie.from(cookie.getName(), value)
                 .httpOnly(cookie.isHttpOnly())
                 .secure(cookie.isSecure())
                 .sameSite(cookie.getSameSite())
-                .path(cookie.getPath())
-                .maxAge(Duration.ofSeconds(ttlSeconds))
-                .build();
+                .path(cookie.getPath());
     }
 }

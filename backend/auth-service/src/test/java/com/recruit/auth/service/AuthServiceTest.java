@@ -2,10 +2,13 @@ package com.recruit.auth.service;
 
 import com.recruit.auth.dto.LoginForm;
 import com.recruit.auth.dto.LoginResult;
+import com.recruit.auth.dto.RefreshResult;
 import com.recruit.auth.entity.IamDepartment;
 import com.recruit.auth.entity.IamUser;
 import com.recruit.auth.mapper.IamDepartmentMapper;
 import com.recruit.auth.mapper.IamUserMapper;
+import com.recruit.auth.security.JwtClaims;
+import com.recruit.auth.security.TokenType;
 import com.recruit.common.exception.BizException;
 import com.recruit.common.result.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +22,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -215,6 +219,58 @@ class AuthServiceTest {
         assertNull(result.user().deptName());
     }
 
+    @Test
+    void refreshRejectsMalformedToken() {
+        when(tokenService.parseRefreshToken("bad-token")).thenThrow(new IllegalArgumentException("bad"));
+
+        BizException exception = assertThrows(BizException.class,
+                () -> authService.refresh("bad-token", request("10.0.0.1", "JUnit")));
+
+        assertEquals(ErrorCode.AUTH_REFRESH_INVALID, exception.getErrorCode());
+        verifyNoInteractions(refreshSessionService);
+    }
+
+    @Test
+    void refreshRejectsMissingToken() {
+        BizException exception = assertThrows(BizException.class,
+                () -> authService.refresh("  ", request("10.0.0.1", "JUnit")));
+
+        assertEquals(ErrorCode.AUTH_REFRESH_INVALID, exception.getErrorCode());
+    }
+
+    @Test
+    void refreshRejectsUnknownUser() {
+        when(tokenService.parseRefreshToken("refresh-token")).thenReturn(refreshClaims());
+        when(userMapper.selectById(10001L)).thenReturn(null);
+
+        BizException exception = assertThrows(BizException.class,
+                () -> authService.refresh("refresh-token", request("10.0.0.1", "JUnit")));
+
+        assertEquals(ErrorCode.AUTH_REFRESH_INVALID, exception.getErrorCode());
+        verifyNoInteractions(refreshSessionService);
+    }
+
+    @Test
+    void refreshRotatesAndIssuesNewAccessToken() {
+        IamUser user = activeUser("secret");
+        JwtClaims claims = refreshClaims();
+        when(tokenService.parseRefreshToken("refresh-token")).thenReturn(claims);
+        when(userMapper.selectById(10001L)).thenReturn(user);
+        when(permissionService.roleCodes(10001L)).thenReturn(List.of("RECRUITER"));
+        when(refreshSessionService.rotate("refresh-token", claims, user, List.of("RECRUITER"), 3L,
+                "10.0.0.1", "JUnit"))
+                .thenReturn(new RefreshSessionService.IssuedRefresh("new-refresh", "family-1", "jti-new"));
+        when(tokenService.createAccessToken(user, List.of("RECRUITER"), 3L)).thenReturn("new-access");
+        when(tokenService.accessTtlSeconds()).thenReturn(7200L);
+
+        RefreshResult result = authService.refresh("refresh-token", request("10.0.0.1", "JUnit"));
+
+        assertEquals("new-access", result.accessToken());
+        assertEquals("Bearer", result.tokenType());
+        assertEquals(7200L, result.expiresIn());
+        assertEquals("new-refresh", result.refreshToken());
+    }
+
     private IamUser activeUser(String rawPassword) {
         IamUser user = new IamUser();
         user.setId(10001L);
@@ -225,6 +281,12 @@ class AuthServiceTest {
         user.setTokenVersion(3);
         user.setPasswordHash(rawPassword == null ? null : passwordEncoder.encode(rawPassword));
         return user;
+    }
+
+    private static JwtClaims refreshClaims() {
+        Instant now = Instant.now();
+        return new JwtClaims("10001", "hr01", List.of("RECRUITER"), 3L, "jti-old",
+                TokenType.REFRESH, "family-1", now, now.plusSeconds(604800));
     }
 
     private static LoginForm form(String username, String password, String userType) {

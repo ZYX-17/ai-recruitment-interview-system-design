@@ -29,4 +29,17 @@ class RefreshCookieFactoryTest {
         assertEquals("/api/auth", cookie.getPath());
         assertEquals(Duration.ofSeconds(604800), cookie.getMaxAge());
     }
+
+    @Test
+    void clearCookieExpiresImmediately() {
+        SecurityProperties properties = new SecurityProperties();
+        RefreshCookieFactory factory = new RefreshCookieFactory(properties);
+
+        ResponseCookie cookie = factory.clear();
+
+        assertEquals("", cookie.getValue());
+        assertEquals(Duration.ZERO, cookie.getMaxAge());
+        assertTrue(cookie.isHttpOnly());
+        assertEquals("/api/auth", cookie.getPath());
+    }
 }
