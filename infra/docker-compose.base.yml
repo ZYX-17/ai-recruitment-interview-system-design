@@ -18,10 +18,11 @@ services:
       # 首次启动自动建 7 库（sql/00_create_databases.sql）；建表由各服务 Flyway 或手动执行
       - ../sql/00_create_databases.sql:/docker-entrypoint-initdb.d/00_create_databases.sql:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-proot"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
       interval: 5s
       timeout: 3s
       retries: 20
+      start_period: 30s
 
   redis:
     image: redis:7.2
@@ -31,6 +32,11 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   rabbitmq:
     image: rabbitmq:3.13-management
@@ -44,6 +50,12 @@ services:
       - "15672:15672"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
     # TODO(W1)：启用延迟插件 rabbitmq_delayed_message_exchange（offer 过期/跟进提醒）
     # command: sh -c "rabbitmq-plugins enable --offline rabbitmq_delayed_message_exchange && rabbitmq-server"
 
@@ -62,6 +74,12 @@ services:
       - "9848:9848"
     volumes:
       - nacos-data:/home/nacos/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8848/nacos/v1/console/health/readiness | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
 
   minio:
     image: minio/minio
@@ -76,6 +94,12 @@ services:
       - "9001:9001"
     volumes:
       - minio-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
@@ -90,6 +114,12 @@ services:
       - "9200:9200"
     volumes:
       - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS 'http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=2s'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
     # TODO(W1)：IK 分词器（analysis-ik 8.13.4）需自构建镜像或 plugins 安装；向量索引 mapping 见开发文档
 
   livekit:
@@ -101,6 +131,7 @@ services:
       - "7881:7881"            # RTC TCP 兜底
       - "50000-50100:50000-50100/udp"   # UDP 直暴露，不经 Nginx
     command: --dev --bind 0.0.0.0
+    # 不做 healthcheck：livekit 镜像不含 curl/wget，避免被误判 unhealthy；就绪由 / 探活脚本判断
     # TODO(W1 spike)：生产改用 config.yaml（TURN/TCP 443 兜底、keys 环境变量注入）
 
   egress:
