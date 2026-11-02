@@ -11,15 +11,19 @@ import com.recruit.common.result.ErrorCode;
 import com.recruit.common.result.Result;
 import com.recruit.contracts.event.EventEnvelope;
 import com.recruit.contracts.event.EventTypes;
+import com.recruit.resume.client.AiServiceClient;
 import com.recruit.resume.client.FileClient;
 import com.recruit.resume.client.dto.DownloadUrlDTO;
+import com.recruit.resume.client.dto.ExtractionResponse;
 import com.recruit.resume.client.dto.InternalPresignDownloadRequest;
 import com.recruit.resume.entity.Resume;
 import com.recruit.resume.entity.ResumeChunk;
 import com.recruit.resume.entity.ResumeParseTask;
+import com.recruit.resume.entity.ResumeVersion;
 import com.recruit.resume.mapper.ResumeChunkMapper;
 import com.recruit.resume.mapper.ResumeMapper;
 import com.recruit.resume.mapper.ResumeParseTaskMapper;
+import com.recruit.resume.mapper.ResumeVersionMapper;
 import com.recruit.resume.support.ParseTaskStatus;
 import com.recruit.resume.support.ResumeChunker;
 import com.recruit.resume.support.ResumeStatus;
@@ -52,7 +56,9 @@ public class ResumeIndexingService {
     private final ResumeMapper resumeMapper;
     private final ResumeParseTaskMapper taskMapper;
     private final ResumeChunkMapper chunkMapper;
+    private final ResumeVersionMapper resumeVersionMapper;
     private final FileClient fileClient;
+    private final AiServiceClient aiServiceClient;
     private final EmbeddingService embeddingService;
     private final ResumeEsService resumeEsService;
     private final OutboxService outboxService;
@@ -96,6 +102,12 @@ public class ResumeIndexingService {
                 throw new BizException(ErrorCode.RESUME_PARSE_FAILED, "分块结果为空");
             }
 
+            // AI 实体抽取是草稿；失败不阻断索引，structuredJson 可后续重新抽取
+            JsonNode structured = extractStructured(resumeId, markdown);
+            if (structured != null) {
+                saveStructured(resume, structured);
+            }
+
             List<String> contents = chunks.stream().map(ResumeChunker.Chunk::content).toList();
             EmbeddingService.EmbeddingResult embedding = embeddingService.embed(contents);
             resumeEsService.indexChunks(resumeId, resume.getPersonId(), chunks,
@@ -109,6 +121,32 @@ public class ResumeIndexingService {
         } catch (Exception e) {
             log.error("简历索引失败 resumeId={}, taskNo={}", resumeId, taskNo, e);
             fail(resume, taskNo, e.getMessage());
+        }
+    }
+
+    private JsonNode extractStructured(long resumeId, String markdown) {
+        try {
+            ExtractionResponse extraction = aiServiceClient.extractResume(resumeId, markdown);
+            return extraction.structured() == null
+                    ? null
+                    : objectMapper.valueToTree(extraction.structured());
+        } catch (Exception e) {
+            log.warn("AI 实体抽取失败，继续索引 resumeId={}：{}", resumeId, e.getMessage());
+            return null;
+        }
+    }
+
+    private void saveStructured(Resume resume, JsonNode structured) {
+        String json = structured.toString();
+        resumeMapper.update(null, Wrappers.<Resume>lambdaUpdate()
+                .eq(Resume::getId, resume.getId())
+                .set(Resume::getStructuredJson, json));
+        int versionNo = resume.getCurrentVersionNo() == null ? 0 : resume.getCurrentVersionNo();
+        if (versionNo > 0) {
+            resumeVersionMapper.update(null, Wrappers.<ResumeVersion>lambdaUpdate()
+                    .eq(ResumeVersion::getResumeId, resume.getId())
+                    .eq(ResumeVersion::getVersionNo, versionNo)
+                    .set(ResumeVersion::getStructuredJson, json));
         }
     }
 

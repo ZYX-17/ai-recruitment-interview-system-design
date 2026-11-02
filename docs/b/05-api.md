@@ -104,6 +104,30 @@
 | GET/PUT | `/api/ai/prompts/**` | `ai:prompt:view/update` | Prompt 管理（P2） |
 | GET/POST | `/api/ai/tasks/**` | `ai:task:view/retry` | 任务管理（P2） |
 
+**AI 任务/抽取 DTO（P5）**：
+
+```json
+// POST /api/ai/v1/tasks
+{
+  "bizType": "RESUME_EXTRACT",
+  "bizId": "90001",
+  "caller": "resume-service",
+  "input": {"text": "# 张三 ..."},
+  "asyncMode": true,
+  "promptVersion": null
+}
+// → {"code":"0","data":{"taskNo":"AI...","status":"PENDING",...}}
+
+// GET /api/ai/v1/tasks/{taskNo}
+// → {"code":"0","data":{"taskNo":"...","status":"SUCCESS","progress":100,"output":{...},"model":"deepseek-chat",...}}
+
+// POST /api/ai/v1/extract/resume（同步，resume-service 索引阶段调用）
+{"resumeId":"90001","text":"# 张三 ...","promptVersion":null}
+// → {"code":"0","data":{"structured":{...},"provider":"cloud","model":"deepseek-chat","promptVersion":1,"latencyMs":1234,"repaired":false}}
+```
+
+- 内部接口需 `X-Internal-Token`；任务状态落 `ai_task`，抽取结果落 `ai_result`，每次调用落 `ai_call_log`。
+
 **纪要回写/复核（与 A 的边界）**：
 
 | 方法 | 路径 | 权限 | 说明 |

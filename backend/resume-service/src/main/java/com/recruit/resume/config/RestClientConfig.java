@@ -23,4 +23,21 @@ public class RestClientConfig {
                 .requestFactory(factory)
                 .build();
     }
+
+    /**
+     * ai-service：抽取可能走云端/本地 LLM，读超时放宽到 60 秒。
+     */
+    @Bean
+    public RestClient aiServiceRestClient(
+            @Value("${recruit.ai-service.url:http://127.0.0.1:9010}") String baseUrl,
+            @Value("${recruit.internal.token:dev-internal-token}") String internalToken) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(3000);
+        factory.setReadTimeout(60000);
+        return RestClient.builder()
+                .baseUrl(baseUrl)
+                .defaultHeader("X-Internal-Token", internalToken)
+                .requestFactory(factory)
+                .build();
+    }
 }

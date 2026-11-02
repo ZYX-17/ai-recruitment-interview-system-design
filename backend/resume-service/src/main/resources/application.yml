@@ -85,6 +85,9 @@ recruit:
   # ai-worker BGE embedding（不注册 Nacos，固定地址）
   ai-worker:
     url: ${AI_WORKER_URL:http://127.0.0.1:8001}
+  # ai-service 实体抽取（X-Internal-Token）
+  ai-service:
+    url: ${AI_SERVICE_URL:http://127.0.0.1:9010}
   embed:
     dims: 512
     batch-size: ${EMBED_BATCH_SIZE:32}

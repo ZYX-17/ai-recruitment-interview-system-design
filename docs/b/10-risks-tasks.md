@@ -77,11 +77,13 @@
 - [x] 混合检索 BM25+kNN+RRF、mysql-like 兜底、`POST /api/resume/search`
 
 ### P5 · ai-service
-- [ ] 任务持久化/状态机
-- [ ] LLM 云端优先 → 本地 OpenAI 兼容 → Mock；`local_llm.py` 单独文件；超时/降级/熔断/配额
-- [ ] Prompt 版本、JSON Schema/Pydantic、修复重试
-- [ ] 实体抽取/重抽取/health
-- [ ] 调用审计、人工复核
+- [x] 任务持久化/状态机（`ai_task` + BackgroundTasks，PENDING→RUNNING→SUCCESS/FAILED/DEAD）
+- [x] LLM 云端优先 → 本地 OpenAI 兼容 → Mock；`local_llm.py` 单独文件；超时/降级
+- [x] Prompt 版本（`prompt_version` + 内置 v1）、JSON Schema/Pydantic、修复重试一次
+- [x] 简历实体抽取、任务轮询/重试、`/health`（含 `db_ready`）
+- [x] 调用审计（`ai_call_log`，含 provider/model/prompt/tokens/latency/降级）
+- [ ] 人工复核端点（`human_review` 表已建，接口待补）
+- [ ] Alembic 迁移（开发期用 `AI_DB_AUTO_CREATE=true` create_all）
 
 ### P6 · 匹配/标签/规则
 - [ ] 硬过滤规则解释器

@@ -113,6 +113,14 @@
 
 **任务状态**：PENDING → RUNNING → SUCCESS / FAILED / DEAD；`progress`、`retry_count`、`error_msg`。
 
+**当前实现**：
+
+- `POST /api/ai/v1/tasks` 提交任务（`RESUME_EXTRACT`），默认 BackgroundTasks 异步执行；`GET /tasks/{taskNo}` 轮询；`POST /tasks/{taskNo}/retry` 重试。
+- `POST /api/ai/v1/extract/resume` 同步抽取，供 resume-service 索引阶段调用；结果不落 `ai_task`，只落调用日志。
+- 抽取链路：读取 ACTIVE Prompt → LLM（`response_format=json_object`）→ 解析/去掉代码块 → Pydantic 校验 → 失败修复一次 → 仍失败置 FAILED。
+- `ai_call_log` 记录 provider/model/prompt/tokens/latency/status/降级目标。
+- 开发期 `AI_DB_AUTO_CREATE=true` 自动建表 + 种子 Prompt；生产切 Alembic。
+
 **能力**：
 
 | 能力 | biz_type | 说明 |

@@ -36,6 +36,7 @@ services:
       EVENTS_EXCHANGE: ${EVENTS_EXCHANGE:-recruit.events}
       FILE_SERVICE_URL: ${FILE_SERVICE_URL:-http://host.docker.internal:8087}
       AI_WORKER_URL: ${RESUME_AI_WORKER_URL:-http://host.docker.internal:8001}
+      AI_SERVICE_URL: ${RESUME_AI_SERVICE_URL:-http://host.docker.internal:9010}
       INTERNAL_TOKEN: ${INTERNAL_TOKEN:-dev-internal-token}
       EMBED_FALLBACK_MOCK: ${EMBED_FALLBACK_MOCK:-true}
       MQ_ENABLED: ${MQ_ENABLED:-true}

@@ -11,7 +11,7 @@
 |---|---|---|---|
 | `recruit_resume` | resume-service | Flyway `V1_0__init.sql` | 复制 `sql/04_recruit_resume.sql`，移除 `USE` |
 | `recruit_file` | file-service | Flyway `V1_0__init.sql` | 复制 `sql/06_recruit_file.sql` |
-| `recruit_ai` | ai-service | SQLAlchemy + Alembic | 复制 `sql/07_recruit_ai.sql`；Python 侧用 Alembic，resume/file 用 Flyway |
+| `recruit_ai` | ai-service | SQLAlchemy + Alembic | 开发期 `AI_DB_AUTO_CREATE=true` 用 `create_all` + 种子 Prompt；生产切 Alembic（待补） |
 
 > Flyway / ES IK / 索引 / MinIO 桶由 B 自行落地，不再等老师；按 P0/P1/P4 任务推进。
 

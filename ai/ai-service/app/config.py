@@ -1,4 +1,6 @@
 """ai-service 配置（pydantic-settings，环境变量注入；密钥不入库/不入仓）。"""
+from urllib.parse import quote_plus
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,9 +16,18 @@ class Settings(BaseSettings):
     mysql_user: str = "root"
     mysql_password: str = "root"
     mysql_db: str = "recruit_ai"
+    # 开发期自动建表 + 种子 Prompt；生产建议 false，改用 Alembic
+    ai_db_auto_create: bool = True
 
     redis_host: str = "127.0.0.1"
     redis_port: int = 6379
+
+    # 内部接口令牌（resume-service/回调方携带 X-Internal-Token）
+    internal_token: str = "dev-internal-token"
+    # 单次抽取输入上限（字符），避免超长简历打爆上下文
+    ai_max_input_chars: int = 12000
+    # 任务失败重试上限，达到后转 DEAD
+    ai_task_max_retry: int = 3
 
     # LLM 路由：cloud 优先 → local（OpenAI 兼容）→ mock（可选）
     ai_mode: str = "auto"              # auto / cloud / local / mock
@@ -42,6 +53,13 @@ class Settings(BaseSettings):
 
     # JWT 公钥（校验 room 签发的 scope=asr 令牌）
     jwt_public_key_path: str = ""
+
+    @property
+    def database_url(self) -> str:
+        return (
+            f"mysql+pymysql://{self.mysql_user}:{quote_plus(self.mysql_password)}"
+            f"@{self.mysql_host}:{self.mysql_port}/{self.mysql_db}?charset=utf8mb4"
+        )
 
 
 settings = Settings()
