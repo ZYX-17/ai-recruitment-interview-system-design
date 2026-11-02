@@ -11,6 +11,10 @@ MYSQL_PORT="${MYSQL_PORT:-3306}"
 MYSQL_USER="${MYSQL_USER:-root}"
 MYSQL_PASSWORD="${MYSQL_PASSWORD:-root}"
 
+# CI 只做空库迁移，不启动服务、不对外登录；该哈希仅存在于临时 MySQL。
+DEFAULT_SEED_ADMIN_PASSWORD_HASH='$2a$10$uttBj0tpDJ.vtjB/YA0bneiMgfi8MwrXNHQcu6N9Zqx/0EDP7x0uy'
+SEED_ADMIN_PASSWORD_HASH="${SEED_ADMIN_PASSWORD_HASH:-$DEFAULT_SEED_ADMIN_PASSWORD_HASH}"
+
 declare -A DB=(
   [auth]="recruit_auth"
   [interview]="recruit_interview"
@@ -33,7 +37,8 @@ for svc in auth interview notify; do
     "-Dflyway.password=${MYSQL_PASSWORD}" \
     "-Dflyway.locations=filesystem:${ROOT}/${dir}" \
     "-Dflyway.validateOnMigrate=true" \
-    "-Dflyway.cleanDisabled=true"
+    "-Dflyway.cleanDisabled=true" \
+    "-Dflyway.placeholders.seedAdminPasswordHash=${SEED_ADMIN_PASSWORD_HASH}"
   migrated=$((migrated + 1))
 done
 
