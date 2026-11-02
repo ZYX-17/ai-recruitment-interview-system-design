@@ -72,6 +72,7 @@ cd frontend && npm install && npm run dev
 | `docs/01-requirements/` | 三份原始题目（需求基线） |
 | `docs/2.架构设计方案-招聘面试系统微服务架构.md` | **架构基线（v3.1）** |
 | `docs/3.开发文档-招聘面试系统.md` | **自包含开发文档（v3.1）** |
+| `docs/05-design/` | 公共件设计说明与 W1 契约冻结（P0-1~P0-5：流程图、事件契约、OpenAPI 目录、ADR、权限码注册表） |
 | `sql/` | 建库建表 DDL 母版 + 可能新增文件清单 |
 
 ## 当前待确认的关键决策

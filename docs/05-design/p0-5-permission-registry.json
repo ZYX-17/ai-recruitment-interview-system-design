@@ -1,0 +1,1185 @@
+{
+  "version": "1.0",
+  "generatedAt": "2026-11-02",
+  "source": "docs/4 附录 C + docs/05-design/p0-5-openapi-catalog.md",
+  "roles": [
+    "SUPER_ADMIN",
+    "HR_ADMIN",
+    "RECRUITER",
+    "INTERVIEWER",
+    "CANDIDATE"
+  ],
+  "groups": [
+    {
+      "code": "system:user",
+      "name": "用户管理",
+      "module": "系统管理"
+    },
+    {
+      "code": "system:role",
+      "name": "角色管理",
+      "module": "系统管理"
+    },
+    {
+      "code": "system:menu",
+      "name": "权限菜单",
+      "module": "系统管理"
+    },
+    {
+      "code": "system:dept",
+      "name": "部门管理",
+      "module": "系统管理"
+    },
+    {
+      "code": "system:dict",
+      "name": "数据字典",
+      "module": "系统管理"
+    },
+    {
+      "code": "system:config",
+      "name": "系统配置",
+      "module": "系统管理"
+    },
+    {
+      "code": "system:log",
+      "name": "审计日志",
+      "module": "系统管理"
+    },
+    {
+      "code": "system:notice",
+      "name": "通知模板",
+      "module": "系统管理"
+    },
+    {
+      "code": "interview:job",
+      "name": "岗位管理",
+      "module": "面试管理"
+    },
+    {
+      "code": "interview:process",
+      "name": "流程模板",
+      "module": "面试管理"
+    },
+    {
+      "code": "interview:application",
+      "name": "投递管理",
+      "module": "面试管理"
+    },
+    {
+      "code": "interview:schedule",
+      "name": "面试排期",
+      "module": "面试管理"
+    },
+    {
+      "code": "interview:evaluation-template",
+      "name": "评价模板",
+      "module": "面试管理"
+    },
+    {
+      "code": "interview:evaluation",
+      "name": "面试评价",
+      "module": "面试管理"
+    },
+    {
+      "code": "interview:minutes",
+      "name": "面试纪要",
+      "module": "面试管理"
+    },
+    {
+      "code": "interview:offer",
+      "name": "Offer 管理",
+      "module": "面试管理"
+    },
+    {
+      "code": "interview:async",
+      "name": "异步面试",
+      "module": "面试管理"
+    },
+    {
+      "code": "interview:stats",
+      "name": "招聘统计",
+      "module": "面试管理"
+    },
+    {
+      "code": "portal:job",
+      "name": "门户岗位",
+      "module": "候选人门户"
+    },
+    {
+      "code": "portal:application",
+      "name": "门户投递",
+      "module": "候选人门户"
+    },
+    {
+      "code": "portal:interview",
+      "name": "门户面试",
+      "module": "候选人门户"
+    },
+    {
+      "code": "portal:async",
+      "name": "门户异步面试",
+      "module": "候选人门户"
+    },
+    {
+      "code": "portal:offer",
+      "name": "门户 Offer",
+      "module": "候选人门户"
+    },
+    {
+      "code": "portal:message",
+      "name": "门户消息",
+      "module": "候选人门户"
+    }
+  ],
+  "permissions": [
+    {
+      "code": "system:user:view",
+      "type": "MENU",
+      "parentCode": "system:user",
+      "module": "系统管理",
+      "name": "用户查看",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN"
+      ]
+    },
+    {
+      "code": "system:user:create",
+      "type": "BUTTON",
+      "parentCode": "system:user",
+      "module": "系统管理",
+      "name": "用户新增",
+      "apiPattern": "POST /api/admin/users",
+      "sort": 20,
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "code": "system:user:update",
+      "type": "BUTTON",
+      "parentCode": "system:user",
+      "module": "系统管理",
+      "name": "用户修改",
+      "apiPattern": "PUT /api/admin/users/{id}",
+      "sort": 30,
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "code": "system:user:delete",
+      "type": "BUTTON",
+      "parentCode": "system:user",
+      "module": "系统管理",
+      "name": "用户删除",
+      "apiPattern": "DELETE /api/admin/users/{id}",
+      "sort": 40,
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "code": "system:user:reset-password",
+      "type": "BUTTON",
+      "parentCode": "system:user",
+      "module": "系统管理",
+      "name": "重置密码",
+      "apiPattern": "POST /api/admin/users/{id}/reset-password",
+      "sort": 50,
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "code": "system:user:assign-role",
+      "type": "BUTTON",
+      "parentCode": "system:user",
+      "module": "系统管理",
+      "name": "分配角色",
+      "apiPattern": "PUT /api/admin/users/{id}/roles",
+      "sort": 60,
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "code": "system:user:kick",
+      "type": "BUTTON",
+      "parentCode": "system:user",
+      "module": "系统管理",
+      "name": "强制下线",
+      "apiPattern": "POST /api/admin/users/{id}/kick",
+      "sort": 70,
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "code": "system:role:view",
+      "type": "MENU",
+      "parentCode": "system:role",
+      "module": "系统管理",
+      "name": "角色查看",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN"
+      ]
+    },
+    {
+      "code": "system:role:create",
+      "type": "BUTTON",
+      "parentCode": "system:role",
+      "module": "系统管理",
+      "name": "角色新增",
+      "apiPattern": "POST /api/admin/roles",
+      "sort": 20,
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "code": "system:role:update",
+      "type": "BUTTON",
+      "parentCode": "system:role",
+      "module": "系统管理",
+      "name": "角色修改",
+      "apiPattern": "PUT /api/admin/roles/{id}",
+      "sort": 30,
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "code": "system:role:delete",
+      "type": "BUTTON",
+      "parentCode": "system:role",
+      "module": "系统管理",
+      "name": "角色删除",
+      "apiPattern": "DELETE /api/admin/roles/{id}",
+      "sort": 40,
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "code": "system:role:assign-menu",
+      "type": "BUTTON",
+      "parentCode": "system:role",
+      "module": "系统管理",
+      "name": "分配权限/菜单",
+      "apiPattern": "PUT /api/admin/roles/{id}/permissions|PUT /api/admin/roles/{id}/menus",
+      "sort": 50,
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "code": "system:menu:view",
+      "type": "MENU",
+      "parentCode": "system:menu",
+      "module": "系统管理",
+      "name": "权限查看",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN"
+      ]
+    },
+    {
+      "code": "system:menu:create",
+      "type": "BUTTON",
+      "parentCode": "system:menu",
+      "module": "系统管理",
+      "name": "权限新增",
+      "apiPattern": "POST /api/admin/permissions",
+      "sort": 20,
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "code": "system:menu:update",
+      "type": "BUTTON",
+      "parentCode": "system:menu",
+      "module": "系统管理",
+      "name": "权限修改",
+      "apiPattern": "PUT /api/admin/permissions/{id}",
+      "sort": 30,
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "code": "system:menu:delete",
+      "type": "BUTTON",
+      "parentCode": "system:menu",
+      "module": "系统管理",
+      "name": "权限删除",
+      "apiPattern": "DELETE /api/admin/permissions/{id}",
+      "sort": 40,
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "code": "system:dept:view",
+      "type": "MENU",
+      "parentCode": "system:dept",
+      "module": "系统管理",
+      "name": "部门查看",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN"
+      ]
+    },
+    {
+      "code": "system:dept:create",
+      "type": "BUTTON",
+      "parentCode": "system:dept",
+      "module": "系统管理",
+      "name": "部门新增",
+      "apiPattern": "POST /api/admin/depts",
+      "sort": 20,
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "code": "system:dept:update",
+      "type": "BUTTON",
+      "parentCode": "system:dept",
+      "module": "系统管理",
+      "name": "部门修改",
+      "apiPattern": "PUT /api/admin/depts/{id}",
+      "sort": 30,
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "code": "system:dept:delete",
+      "type": "BUTTON",
+      "parentCode": "system:dept",
+      "module": "系统管理",
+      "name": "部门删除",
+      "apiPattern": "DELETE /api/admin/depts/{id}",
+      "sort": 40,
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "code": "system:dict:view",
+      "type": "MENU",
+      "parentCode": "system:dict",
+      "module": "系统管理",
+      "name": "字典查看",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN"
+      ]
+    },
+    {
+      "code": "system:dict:update",
+      "type": "BUTTON",
+      "parentCode": "system:dict",
+      "module": "系统管理",
+      "name": "字典修改",
+      "apiPattern": "PUT /api/admin/dicts/{id}",
+      "sort": 20,
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "code": "system:config:view",
+      "type": "MENU",
+      "parentCode": "system:config",
+      "module": "系统管理",
+      "name": "配置查看",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "code": "system:config:update",
+      "type": "BUTTON",
+      "parentCode": "system:config",
+      "module": "系统管理",
+      "name": "配置修改/Outbox 重放",
+      "apiPattern": "POST /api/admin/outbox/{service}/{id}/replay|GET /api/admin/outbox/{service}/messages",
+      "sort": 20,
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "code": "system:log:login:view",
+      "type": "MENU",
+      "parentCode": "system:log",
+      "module": "系统管理",
+      "name": "登录日志",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN"
+      ]
+    },
+    {
+      "code": "system:log:oper:view",
+      "type": "MENU",
+      "parentCode": "system:log",
+      "module": "系统管理",
+      "name": "操作日志",
+      "apiPattern": "",
+      "sort": 20,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN"
+      ]
+    },
+    {
+      "code": "system:notice:view",
+      "type": "MENU",
+      "parentCode": "system:notice",
+      "module": "系统管理",
+      "name": "通知模板查看",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN"
+      ]
+    },
+    {
+      "code": "system:notice:update",
+      "type": "BUTTON",
+      "parentCode": "system:notice",
+      "module": "系统管理",
+      "name": "通知模板修改/重发",
+      "apiPattern": "PUT /api/notify/templates/{id}|POST /api/notify/messages/{id}/resend",
+      "sort": 20,
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "code": "interview:job:view",
+      "type": "MENU",
+      "parentCode": "interview:job",
+      "module": "面试管理",
+      "name": "岗位查看",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER",
+        "INTERVIEWER"
+      ]
+    },
+    {
+      "code": "interview:job:create",
+      "type": "BUTTON",
+      "parentCode": "interview:job",
+      "module": "面试管理",
+      "name": "岗位新增",
+      "apiPattern": "POST /api/interview/jobs",
+      "sort": 20,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:job:update",
+      "type": "BUTTON",
+      "parentCode": "interview:job",
+      "module": "面试管理",
+      "name": "岗位修改",
+      "apiPattern": "PUT /api/interview/jobs/{id}",
+      "sort": 30,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:job:delete",
+      "type": "BUTTON",
+      "parentCode": "interview:job",
+      "module": "面试管理",
+      "name": "岗位删除",
+      "apiPattern": "DELETE /api/interview/jobs/{id}",
+      "sort": 40,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:job:publish",
+      "type": "BUTTON",
+      "parentCode": "interview:job",
+      "module": "面试管理",
+      "name": "岗位发布",
+      "apiPattern": "POST /api/interview/jobs/{id}/publish",
+      "sort": 50,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:job:close",
+      "type": "BUTTON",
+      "parentCode": "interview:job",
+      "module": "面试管理",
+      "name": "岗位关闭",
+      "apiPattern": "POST /api/interview/jobs/{id}/close",
+      "sort": 60,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:process:view",
+      "type": "MENU",
+      "parentCode": "interview:process",
+      "module": "面试管理",
+      "name": "流程模板查看",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER",
+        "INTERVIEWER"
+      ]
+    },
+    {
+      "code": "interview:process:create",
+      "type": "BUTTON",
+      "parentCode": "interview:process",
+      "module": "面试管理",
+      "name": "流程模板新增",
+      "apiPattern": "POST /api/interview/process-templates",
+      "sort": 20,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:process:update",
+      "type": "BUTTON",
+      "parentCode": "interview:process",
+      "module": "面试管理",
+      "name": "流程模板修改",
+      "apiPattern": "PUT /api/interview/process-templates/{id}",
+      "sort": 30,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:process:delete",
+      "type": "BUTTON",
+      "parentCode": "interview:process",
+      "module": "面试管理",
+      "name": "流程模板删除",
+      "apiPattern": "DELETE /api/interview/process-templates/{id}",
+      "sort": 40,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:application:view",
+      "type": "MENU",
+      "parentCode": "interview:application",
+      "module": "面试管理",
+      "name": "投递查看",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER",
+        "INTERVIEWER"
+      ]
+    },
+    {
+      "code": "interview:application:create",
+      "type": "BUTTON",
+      "parentCode": "interview:application",
+      "module": "面试管理",
+      "name": "投递新增",
+      "apiPattern": "POST /api/interview/applications",
+      "sort": 20,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:application:update",
+      "type": "BUTTON",
+      "parentCode": "interview:application",
+      "module": "面试管理",
+      "name": "投递推进/录用",
+      "apiPattern": "POST /api/interview/applications/{id}/actions",
+      "sort": 30,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:application:withdraw",
+      "type": "BUTTON",
+      "parentCode": "interview:application",
+      "module": "面试管理",
+      "name": "投递撤回",
+      "apiPattern": "POST /api/interview/applications/{id}/actions",
+      "sort": 40,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:application:reject",
+      "type": "BUTTON",
+      "parentCode": "interview:application",
+      "module": "面试管理",
+      "name": "投递淘汰",
+      "apiPattern": "POST /api/interview/applications/{id}/actions",
+      "sort": 50,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:application:transfer",
+      "type": "BUTTON",
+      "parentCode": "interview:application",
+      "module": "面试管理",
+      "name": "投递转移",
+      "apiPattern": "POST /api/interview/applications/{id}/actions",
+      "sort": 60,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:schedule:view",
+      "type": "MENU",
+      "parentCode": "interview:schedule",
+      "module": "面试管理",
+      "name": "排期查看",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER",
+        "INTERVIEWER"
+      ]
+    },
+    {
+      "code": "interview:schedule:create",
+      "type": "BUTTON",
+      "parentCode": "interview:schedule",
+      "module": "面试管理",
+      "name": "排期新增",
+      "apiPattern": "POST /api/interview/schedules",
+      "sort": 20,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:schedule:update",
+      "type": "BUTTON",
+      "parentCode": "interview:schedule",
+      "module": "面试管理",
+      "name": "排期修改",
+      "apiPattern": "PUT /api/interview/schedules/{id}",
+      "sort": 30,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:schedule:cancel",
+      "type": "BUTTON",
+      "parentCode": "interview:schedule",
+      "module": "面试管理",
+      "name": "排期取消",
+      "apiPattern": "DELETE /api/interview/schedules/{id}",
+      "sort": 40,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:schedule:batch",
+      "type": "BUTTON",
+      "parentCode": "interview:schedule",
+      "module": "面试管理",
+      "name": "批量排期",
+      "apiPattern": "POST /api/interview/schedules/batch",
+      "sort": 50,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:evaluation-template:view",
+      "type": "MENU",
+      "parentCode": "interview:evaluation-template",
+      "module": "面试管理",
+      "name": "评价模板查看",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:evaluation-template:create",
+      "type": "BUTTON",
+      "parentCode": "interview:evaluation-template",
+      "module": "面试管理",
+      "name": "评价模板新增",
+      "apiPattern": "POST /api/interview/evaluation-templates",
+      "sort": 20,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN"
+      ]
+    },
+    {
+      "code": "interview:evaluation-template:update",
+      "type": "BUTTON",
+      "parentCode": "interview:evaluation-template",
+      "module": "面试管理",
+      "name": "评价模板修改",
+      "apiPattern": "PUT /api/interview/evaluation-templates/{id}",
+      "sort": 30,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN"
+      ]
+    },
+    {
+      "code": "interview:evaluation-template:delete",
+      "type": "BUTTON",
+      "parentCode": "interview:evaluation-template",
+      "module": "面试管理",
+      "name": "评价模板删除",
+      "apiPattern": "DELETE /api/interview/evaluation-templates/{id}",
+      "sort": 40,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN"
+      ]
+    },
+    {
+      "code": "interview:evaluation:view",
+      "type": "MENU",
+      "parentCode": "interview:evaluation",
+      "module": "面试管理",
+      "name": "评价查看",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER",
+        "INTERVIEWER"
+      ]
+    },
+    {
+      "code": "interview:evaluation:submit",
+      "type": "BUTTON",
+      "parentCode": "interview:evaluation",
+      "module": "面试管理",
+      "name": "评价提交",
+      "apiPattern": "POST /api/interview/schedules/{id}/evaluations",
+      "sort": 20,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER",
+        "INTERVIEWER"
+      ]
+    },
+    {
+      "code": "interview:evaluation:reopen",
+      "type": "BUTTON",
+      "parentCode": "interview:evaluation",
+      "module": "面试管理",
+      "name": "评价重开",
+      "apiPattern": "PUT /api/interview/evaluations/{id}/reopen",
+      "sort": 30,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN"
+      ]
+    },
+    {
+      "code": "interview:minutes:view",
+      "type": "MENU",
+      "parentCode": "interview:minutes",
+      "module": "面试管理",
+      "name": "纪要查看",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER",
+        "INTERVIEWER"
+      ]
+    },
+    {
+      "code": "interview:minutes:confirm",
+      "type": "BUTTON",
+      "parentCode": "interview:minutes",
+      "module": "面试管理",
+      "name": "纪要确认",
+      "apiPattern": "PUT /api/interview/minutes/{id}/confirm",
+      "sort": 20,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN"
+      ]
+    },
+    {
+      "code": "interview:offer:view",
+      "type": "MENU",
+      "parentCode": "interview:offer",
+      "module": "面试管理",
+      "name": "Offer 查看",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:offer:create",
+      "type": "BUTTON",
+      "parentCode": "interview:offer",
+      "module": "面试管理",
+      "name": "Offer 创建",
+      "apiPattern": "POST /api/interview/offers",
+      "sort": 20,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:offer:send",
+      "type": "BUTTON",
+      "parentCode": "interview:offer",
+      "module": "面试管理",
+      "name": "Offer 发送",
+      "apiPattern": "POST /api/interview/offers/{id}/send",
+      "sort": 30,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:offer:approve",
+      "type": "BUTTON",
+      "parentCode": "interview:offer",
+      "module": "面试管理",
+      "name": "Offer 审批",
+      "apiPattern": "POST /api/interview/offers/{id}/approve",
+      "sort": 40,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN"
+      ]
+    },
+    {
+      "code": "interview:offer:withdraw",
+      "type": "BUTTON",
+      "parentCode": "interview:offer",
+      "module": "面试管理",
+      "name": "Offer 撤回",
+      "apiPattern": "POST /api/interview/offers/{id}/withdraw",
+      "sort": 50,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:async:view",
+      "type": "MENU",
+      "parentCode": "interview:async",
+      "module": "面试管理",
+      "name": "异步面试查看",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:async:create",
+      "type": "BUTTON",
+      "parentCode": "interview:async",
+      "module": "面试管理",
+      "name": "异步试卷创建",
+      "apiPattern": "POST /api/interview/async-interviews",
+      "sort": 20,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:async:update",
+      "type": "BUTTON",
+      "parentCode": "interview:async",
+      "module": "面试管理",
+      "name": "异步试卷修改/加题",
+      "apiPattern": "PUT /api/interview/async-interviews/{id}|POST /api/interview/async-interviews/{id}/questions",
+      "sort": 30,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:async:publish",
+      "type": "BUTTON",
+      "parentCode": "interview:async",
+      "module": "面试管理",
+      "name": "异步试卷发布",
+      "apiPattern": "POST /api/interview/async-interviews/{id}/publish",
+      "sort": 40,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "interview:stats:view",
+      "type": "MENU",
+      "parentCode": "interview:stats",
+      "module": "面试管理",
+      "name": "招聘统计查看",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "SUPER_ADMIN",
+        "HR_ADMIN",
+        "RECRUITER"
+      ]
+    },
+    {
+      "code": "portal:job:view",
+      "type": "MENU",
+      "parentCode": "portal:job",
+      "module": "候选人门户",
+      "name": "门户岗位浏览",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "CANDIDATE"
+      ]
+    },
+    {
+      "code": "portal:application:view",
+      "type": "MENU",
+      "parentCode": "portal:application",
+      "module": "候选人门户",
+      "name": "我的投递",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "CANDIDATE"
+      ]
+    },
+    {
+      "code": "portal:application:create",
+      "type": "BUTTON",
+      "parentCode": "portal:application",
+      "module": "候选人门户",
+      "name": "投递岗位",
+      "apiPattern": "POST /api/interview/portal/applications",
+      "sort": 20,
+      "roles": [
+        "CANDIDATE"
+      ]
+    },
+    {
+      "code": "portal:application:withdraw",
+      "type": "BUTTON",
+      "parentCode": "portal:application",
+      "module": "候选人门户",
+      "name": "撤回投递",
+      "apiPattern": "POST /api/interview/portal/applications/{id}/withdraw",
+      "sort": 30,
+      "roles": [
+        "CANDIDATE"
+      ]
+    },
+    {
+      "code": "portal:interview:view",
+      "type": "MENU",
+      "parentCode": "portal:interview",
+      "module": "候选人门户",
+      "name": "我的面试",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "CANDIDATE"
+      ]
+    },
+    {
+      "code": "portal:interview:join",
+      "type": "BUTTON",
+      "parentCode": "portal:interview",
+      "module": "候选人门户",
+      "name": "进入面试间",
+      "apiPattern": "POST /api/interview/portal/interviews/{id}/join",
+      "sort": 20,
+      "roles": [
+        "CANDIDATE"
+      ]
+    },
+    {
+      "code": "portal:async:view",
+      "type": "MENU",
+      "parentCode": "portal:async",
+      "module": "候选人门户",
+      "name": "异步面试入口",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "CANDIDATE"
+      ]
+    },
+    {
+      "code": "portal:async:start",
+      "type": "BUTTON",
+      "parentCode": "portal:async",
+      "module": "候选人门户",
+      "name": "开始异步面试",
+      "apiPattern": "POST /api/interview/portal/async-invites/{token}/start",
+      "sort": 20,
+      "roles": [
+        "CANDIDATE"
+      ]
+    },
+    {
+      "code": "portal:async:submit",
+      "type": "BUTTON",
+      "parentCode": "portal:async",
+      "module": "候选人门户",
+      "name": "提交异步面试",
+      "apiPattern": "POST /api/interview/portal/async-invites/{token}/submit",
+      "sort": 30,
+      "roles": [
+        "CANDIDATE"
+      ]
+    },
+    {
+      "code": "portal:offer:view",
+      "type": "MENU",
+      "parentCode": "portal:offer",
+      "module": "候选人门户",
+      "name": "我的 Offer",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "CANDIDATE"
+      ]
+    },
+    {
+      "code": "portal:offer:respond",
+      "type": "BUTTON",
+      "parentCode": "portal:offer",
+      "module": "候选人门户",
+      "name": "接受/拒绝 Offer",
+      "apiPattern": "POST /api/interview/portal/offers/{token}/respond",
+      "sort": 20,
+      "roles": [
+        "CANDIDATE"
+      ]
+    },
+    {
+      "code": "portal:message:view",
+      "type": "MENU",
+      "parentCode": "portal:message",
+      "module": "候选人门户",
+      "name": "我的消息",
+      "apiPattern": "",
+      "sort": 10,
+      "roles": [
+        "CANDIDATE"
+      ]
+    }
+  ]
+}
