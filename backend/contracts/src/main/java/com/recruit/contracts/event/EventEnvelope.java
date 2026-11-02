@@ -35,4 +35,34 @@ public class EventEnvelope<T> implements Serializable {
     private Instant occurredAt;
     /** 事件负载 */
     private T payload;
+
+    /**
+     * 创建一个事件信封：自动填 eventVersion（查 {@link EventSchemaVersion}）和 occurredAt。
+     *
+     * <p>业务代码只关心 eventId/type/aggregate/payload，版本和时间统一在这里生成，
+     * 避免不同服务写出不同的 eventVersion。</p>
+     *
+     * @param eventId       全局唯一事件 ID（重投时保持不变）
+     * @param eventType     事件类型
+     * @param aggregateId   聚合根 ID
+     * @param aggregateType 聚合根类型，例如 interview
+     * @param traceId       链路 ID
+     * @param payload       事件负载
+     * @param <T>           负载类型
+     * @return 事件信封
+     * @throws IllegalArgumentException 事件类型未登记时抛出
+     */
+    public static <T> EventEnvelope<T> of(String eventId, String eventType, String aggregateId,
+                                          String aggregateType, String traceId, T payload) {
+        return EventEnvelope.<T>builder()
+                .eventId(eventId)
+                .eventType(eventType)
+                .eventVersion(EventSchemaVersion.current(eventType))
+                .aggregateId(aggregateId)
+                .aggregateType(aggregateType)
+                .traceId(traceId)
+                .occurredAt(Instant.now())
+                .payload(payload)
+                .build();
+    }
 }

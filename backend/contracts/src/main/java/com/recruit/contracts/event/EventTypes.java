@@ -42,12 +42,18 @@ public final class EventTypes {
 
     // 面试流程（A/C 域）
     public static final String INTERVIEW_SCHEDULED = "interview.scheduled";   // room 监听建房
-    // 注：文档 5.2 写作 interview.canceled（单 l）；A/C 域尚未对齐，B 暂不改动。
+    /** 面试取消。统一使用双 l 的 cancelled，不再保留单 l 写法。 */
     public static final String INTERVIEW_CANCELLED = "interview.cancelled";
+    /** 面试改期：room 需要更新房间时间，notify 需要重发邀约。 */
+    public static final String INTERVIEW_RESCHEDULED = "interview.rescheduled";
     public static final String INTERVIEW_RESULT_SUBMITTED = "interview.result.submitted";
     public static final String STAGE_CHANGED = "application.stage.changed";
     public static final String OFFER_SENT = "offer.sent";
     public static final String OFFER_CONFIRMED = "offer.confirmed";
+    /** 候选人拒绝 Offer：投递回到 IN_PROGRESS，通知 HR。 */
+    public static final String OFFER_DECLINED = "offer.declined";
+    /** Offer 过期：由延迟消息触发，通知 HR 与候选人。 */
+    public static final String OFFER_EXPIRED = "offer.expired";
 
     // 在线面试（room 域）
     public static final String ROOM_CREATED = "room.created";                 // 建房回执（interview 回填 room_id）
