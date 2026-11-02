@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: auth-service
+  # 纯 JWT 服务：不需要 Boot 默认的内存用户（否则启动会打印随机密码）
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   config:
     import: optional:nacos:auth-service-dev.yaml
   cloud:
@@ -24,7 +27,7 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
   flyway:
-    enabled: false   # W1 起改 true；DDL 母版见仓库根 sql/01_recruit_auth.sql（sql/README.md）
+    enabled: true    # W1 起启用；V1_0 与 sql/01_recruit_auth.sql 同源
     locations: classpath:db/migration
     baseline-on-migrate: true
 
@@ -64,3 +67,20 @@ recruit:
     refresh-token-ttl-days: 7        # 7d
     private-key-path: ${JWT_PRIVATE_KEY_PATH:}   # RS256 私钥（K8s Secret/环境变量）
     public-key-path: ${JWT_PUBLIC_KEY_PATH:}
+    clock-skew-seconds: 30           # exp/nbf 容忍 30s，不放松签名校验
+    key-id: ${JWT_KEY_ID:k1}         # 当前签名 kid，写入 JWT header
+    # 轮换期旧公钥：kid -> 公钥路径；旧公钥至少保留一个 Access TTL
+    previous-public-keys: {}
+  security:
+    # Refresh Token 只走 HttpOnly Cookie，浏览器脚本不可读
+    refresh-cookie:
+      name: recruit_rt
+      http-only: true
+      secure: ${COOKIE_SECURE:true}
+      same-site: Strict
+      path: /api/auth
+      expose-in-body: ${REFRESH_COOKIE_BODY:false}   # 仅 local 联调允许响应体返回
+    # 登录失败锁定口径（P1-3 使用）
+    login:
+      max-failures: 5
+      lock-minutes: 15

@@ -143,7 +143,7 @@ CREATE TABLE iam_refresh_session (
   ip          VARCHAR(64)  NULL,
   expires_at  DATETIME(3)  NOT NULL,               -- 7d
   revoked_at  DATETIME(3)  NULL,
-  status      VARCHAR(16)  NOT NULL DEFAULT 'ACTIVE', -- ACTIVE / REVOKED / REPLAYED
+  status      VARCHAR(16)  NOT NULL DEFAULT 'ACTIVE', -- ACTIVE / CONSUMED / REVOKED / REPLAYED
   created_at  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
   UNIQUE KEY uk_token_hash (token_hash),

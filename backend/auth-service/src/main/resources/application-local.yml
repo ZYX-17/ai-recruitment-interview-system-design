@@ -1,0 +1,7 @@
+# 本地联调 profile（--spring.profiles.active=local）
+# 仅本机使用：HTTP 下 Cookie 不带 Secure，且允许响应体返回 Refresh Token。
+recruit:
+  security:
+    refresh-cookie:
+      secure: false
+      expose-in-body: true

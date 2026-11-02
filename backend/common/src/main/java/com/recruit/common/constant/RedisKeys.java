@@ -40,6 +40,14 @@ public final class RedisKeys {
     public static final String AUTH_PERM = "auth:perm:";
 
     /**
+     * 登录连续失败计数：auth:login:fail:{username}。
+     *
+     * <p>值等于连续失败次数，TTL 为锁定窗口（默认 15 分钟）；达到阈值即视为锁定，
+     * 登录成功或窗口过期后自然清零。username 统一转小写，避免大小写绕过。</p>
+     */
+    public static final String AUTH_LOGIN_FAIL = "auth:login:fail:";
+
+    /**
      * 限流计数：auth:rate:{scope}:{key}。
      *
      * <p>scope 表示限流维度（如 login、sms、refresh），key 表示具体对象
@@ -93,6 +101,26 @@ public final class RedisKeys {
      */
     public static String authPerm(String userId, long version) {
         return AUTH_PERM + requireSegment(userId, "userId") + ":" + version;
+    }
+
+    /**
+     * 构造令牌版本 Key。
+     *
+     * @param userId 用户 ID，不能为空
+     * @return auth:tv:{userId}
+     */
+    public static String authTokenVersion(String userId) {
+        return AUTH_TOKEN_VERSION + requireSegment(userId, "userId");
+    }
+
+    /**
+     * 构造登录失败计数 Key。
+     *
+     * @param username 登录名（内部转小写；允许冒号，避免异常用户名变成 500）
+     * @return auth:login:fail:{username}
+     */
+    public static String authLoginFail(String username) {
+        return AUTH_LOGIN_FAIL + requireText(username == null ? null : username.trim().toLowerCase(java.util.Locale.ROOT), "username");
     }
 
     /**
