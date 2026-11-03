@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# 冒烟：A 域 4 服务健康 + 登录 + 菜单（docs/4 §13 P0-8）
+# 冒烟：A 域 4 服务健康 + 登录 + 菜单 + 统计/Outbox/门户探活（docs/4 §13 P0-8/P12-6）
+#
+# demo 演示数据：auth-service / interview-service 以 --spring.profiles.active=demo 启动后加载
+# db/demo/V9_0__seed_demo.sql（hr01/hr02/interviewer01~03/candidate01/candidate02，密码同 SEED_ADMIN_PASSWORD）。
 #
 # 用法：
 #   ./scripts/smoke.sh                      # 默认 http://127.0.0.1
@@ -131,6 +134,37 @@ if [ -n "$TOKEN" ]; then
   fi
 else
   bad "无 Access Token，跳过菜单校验"
+fi
+
+
+echo "== 统计与运营（P12-6） =="
+if [ -n "$TOKEN" ]; then
+  FUNNEL_RESP="$(curl -s --max-time 10 -H "Authorization: Bearer $TOKEN" "$GATEWAY/api/interview/stats/funnel" 2>/dev/null || true)"
+  FUNNEL_CODE="$(json_code "$FUNNEL_RESP")"
+  if [ "$FUNNEL_CODE" = "0" ]; then
+    ok "招聘漏斗统计可用（/api/interview/stats/funnel）"
+  else
+    bad "招聘漏斗统计失败（code=${FUNNEL_CODE:-none}）：$FUNNEL_RESP"
+  fi
+
+  OUTBOX_RESP="$(curl -s --max-time 10 -H "Authorization: Bearer $TOKEN" "$GATEWAY/api/admin/outbox/interview/messages?pageNum=1&pageSize=10" 2>/dev/null || true)"
+  OUTBOX_CODE="$(json_code "$OUTBOX_RESP")"
+  if [ "$OUTBOX_CODE" = "0" ]; then
+    ok "Outbox 管理列表可用（interview）"
+  else
+    bad "Outbox 管理列表失败（code=${OUTBOX_CODE:-none}）：$OUTBOX_RESP"
+  fi
+else
+  bad "无 Access Token，跳过统计与 Outbox 校验"
+fi
+
+echo "== 门户（免登录，P12-6） =="
+PORTAL_RESP="$(curl -s --max-time 10 "$GATEWAY/api/interview/portal/jobs?pageNum=1&pageSize=5" 2>/dev/null || true)"
+PORTAL_CODE="$(json_code "$PORTAL_RESP")"
+if [ "$PORTAL_CODE" = "0" ]; then
+  ok "门户岗位列表可用（/api/interview/portal/jobs）"
+else
+  bad "门户岗位列表失败（code=${PORTAL_CODE:-none}）：$PORTAL_RESP"
 fi
 
 echo
