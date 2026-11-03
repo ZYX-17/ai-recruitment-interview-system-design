@@ -1,0 +1,4 @@
+# demo profile：在基础迁移之后追加演示数据（可重复执行）
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/demo
