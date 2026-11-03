@@ -1,10 +1,10 @@
 -- ============================================================================
 -- 招聘面试系统 · recruit_auth 库 DDL（v3.1）
 -- 服务：auth-service (IAM) ｜ Owner：A（面试管理子系统，兼平台底座）
--- 表数：9 张 IAM 业务表 + 2 张公共表 = 11 张
+-- 表数：10 张 IAM 业务表 + 2 张公共表 = 12 张
 -- 通用约定：雪花 ID 应用生成（BIGINT UNSIGNED，无 AUTO_INCREMENT）；
 --   枚举一律 VARCHAR；时间 DATETIME(3)（UTC）；关键状态表 version 乐观锁；
---   本文件与 auth-service Flyway V1_0__init.sql 同源（W1 落地）
+--   本文件与 auth-service Flyway V1_0__init.sql 同源（W1 落地）；iam_dict 同步 V1_3
 -- ============================================================================
 
 USE recruit_auth;
@@ -174,6 +174,25 @@ CREATE TABLE iam_audit_log (
   KEY idx_trace (trace_id),
   KEY idx_created (created_at)
 ) COMMENT='操作审计日志表';
+
+-- ----------------------------------------------------------------------------
+-- 9.1 字典（P2-5 / X-11；同步 auth-service Flyway V1_3__dict.sql）
+-- ----------------------------------------------------------------------------
+CREATE TABLE iam_dict (
+  id         BIGINT UNSIGNED NOT NULL,
+  dict_type  VARCHAR(64)  NOT NULL,                -- 字典类型，如 user_status
+  dict_code  VARCHAR(64)  NOT NULL,                -- 枚举码，如 ACTIVE
+  dict_label VARCHAR(128) NOT NULL,                -- 展示文案
+  sort       INT           NOT NULL DEFAULT 0,
+  status     VARCHAR(16)   NOT NULL DEFAULT 'ACTIVE',
+  remark     VARCHAR(255)  NULL,
+  created_at DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  version    INT           NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_type_code (dict_type, dict_code),
+  KEY idx_type (dict_type)
+) COMMENT='字典表（前端下拉与枚举展示）';
 
 -- ============================================================================
 -- 公共表（每个 schema 必备，与各库保持同构）
