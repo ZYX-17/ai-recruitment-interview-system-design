@@ -5,9 +5,13 @@ import com.recruit.auth.dto.ChangePasswordForm;
 import com.recruit.auth.dto.LoginForm;
 import com.recruit.auth.dto.LogoutForm;
 import com.recruit.auth.dto.LoginResult;
+import com.recruit.auth.dto.MeView;
 import com.recruit.auth.dto.RefreshForm;
 import com.recruit.auth.dto.RefreshResult;
+import com.recruit.auth.dto.RegisterForm;
+import com.recruit.auth.dto.RegisterResult;
 import com.recruit.auth.security.UserPrincipal;
+import com.recruit.auth.service.AccountService;
 import com.recruit.auth.service.AuthService;
 import com.recruit.auth.service.TokenService;
 import com.recruit.auth.support.RefreshCookieFactory;
@@ -21,9 +25,11 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -39,9 +45,42 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final AccountService accountService;
     private final RefreshCookieFactory refreshCookieFactory;
     private final SecurityProperties securityProperties;
     private final TokenService tokenService;
+
+    /**
+     * 候选人自助注册（A-02）。
+     *
+     * <p>公开接口，只允许创建 CANDIDATE；用户名唯一，手机号加密存储。
+     * 带 Idempotency-Key 时重复提交返回首次结果。</p>
+     *
+     * @param form    注册入参
+     * @param key     Idempotency-Key，可选
+     * @param request HTTP 请求（写审计 IP）
+     * @return 新用户摘要
+     */
+    @PostMapping("/register")
+    public Result<RegisterResult> register(@Valid @RequestBody RegisterForm form,
+                                           @RequestHeader(value = "Idempotency-Key", required = false) String key,
+                                           HttpServletRequest request) {
+        return Result.ok(accountService.register(form, key, request));
+    }
+
+    /**
+     * 当前登录用户（A-05）。
+     *
+     * @param principal 当前登录主体
+     * @return 用户、角色、权限码、数据范围与脱敏手机号
+     */
+    @GetMapping("/me")
+    public Result<MeView> me(@AuthenticationPrincipal UserPrincipal principal) {
+        if (principal == null) {
+            throw new BizException(ErrorCode.GW_UNAUTHENTICATED);
+        }
+        return Result.ok(accountService.me(Long.parseLong(principal.getUserId())));
+    }
 
     /**
      * 登录。

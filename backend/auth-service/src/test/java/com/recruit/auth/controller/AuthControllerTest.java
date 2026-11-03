@@ -4,6 +4,9 @@ import com.recruit.auth.config.SecurityProperties;
 import com.recruit.auth.dto.ChangePasswordForm;
 import com.recruit.auth.dto.LoginForm;
 import com.recruit.auth.dto.LoginResult;
+import com.recruit.auth.dto.MeView;
+import com.recruit.auth.dto.RegisterForm;
+import com.recruit.auth.dto.RegisterResult;
 import com.recruit.auth.dto.LogoutForm;
 import com.recruit.auth.dto.RefreshForm;
 import com.recruit.auth.dto.RefreshResult;
@@ -11,6 +14,7 @@ import com.recruit.auth.dto.UserSummary;
 import com.recruit.auth.security.JwtClaims;
 import com.recruit.auth.security.TokenType;
 import com.recruit.auth.security.UserPrincipal;
+import com.recruit.auth.service.AccountService;
 import com.recruit.auth.service.AuthService;
 import com.recruit.auth.service.TokenService;
 import com.recruit.auth.support.RefreshCookieFactory;
@@ -54,6 +58,8 @@ class AuthControllerTest {
     @Mock
     private AuthService authService;
     @Mock
+    private AccountService accountService;
+    @Mock
     private TokenService tokenService;
 
     private SecurityProperties properties;
@@ -62,7 +68,8 @@ class AuthControllerTest {
     @BeforeEach
     void setUp() {
         properties = new SecurityProperties();
-        controller = new AuthController(authService, new RefreshCookieFactory(properties), properties, tokenService);
+        controller = new AuthController(authService, accountService,
+                new RefreshCookieFactory(properties), properties, tokenService);
     }
 
     @Test
@@ -222,6 +229,43 @@ class AuthControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(ErrorCode.GW_UNAUTHENTICATED, exception.getErrorCode());
         verify(authService, org.mockito.Mockito.never()).changePassword(org.mockito.ArgumentMatchers.anyLong(),
                 any(), any());
+    }
+
+    @Test
+    void registerDelegatesToAccountService() {
+        RegisterForm form = new RegisterForm();
+        form.setUsername("cand01");
+        form.setPassword("secret-123");
+        form.setDisplayName("候选人-孙");
+        RegisterResult expected = new RegisterResult("10006", "cand01", "候选人-孙", "CANDIDATE");
+        when(accountService.register(eq(form), eq("key-1"), any())).thenReturn(expected);
+
+        Result<RegisterResult> body = controller.register(form, "key-1", new MockHttpServletRequest());
+
+        assertTrue(body.isSuccess());
+        assertNotNull(body.getData());
+        verify(accountService).register(eq(form), eq("key-1"), any());
+    }
+
+    @Test
+    void meRequiresPrincipal() {
+        BizException exception = assertThrows(BizException.class, () -> controller.me(null));
+
+        org.junit.jupiter.api.Assertions.assertEquals(ErrorCode.GW_UNAUTHENTICATED, exception.getErrorCode());
+        verify(accountService, org.mockito.Mockito.never()).me(org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    @Test
+    void meDelegatesWithPrincipalUserId() {
+        MeView expected = new MeView("10001", "hr01", "招聘专员", "EMPLOYEE", null,
+                "20001", java.util.List.of("20001"), java.util.List.of("RECRUITER"),
+                java.util.List.of("interview:job:view"), "DEPARTMENT", false);
+        when(accountService.me(10001L)).thenReturn(expected);
+
+        Result<MeView> body = controller.me(principal());
+
+        assertNotNull(body.getData());
+        verify(accountService).me(10001L);
     }
 
     private static UserPrincipal principal() {
