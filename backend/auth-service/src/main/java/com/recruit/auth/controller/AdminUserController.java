@@ -10,8 +10,7 @@ import com.recruit.auth.dto.UserPageQuery;
 import com.recruit.auth.security.UserPrincipal;
 import com.recruit.auth.service.AdminUserService;
 import com.recruit.auth.support.IpUtil;
-import com.recruit.common.exception.BizException;
-import com.recruit.common.result.ErrorCode;
+import com.recruit.auth.support.PrincipalHelper;
 import com.recruit.common.result.PageResult;
 import com.recruit.common.result.Result;
 import jakarta.servlet.http.HttpServletRequest;
@@ -52,7 +51,7 @@ public class AdminUserController {
     @PreAuthorize("@permissionChecker.has('system:user:view')")
     public Result<PageResult<AdminUserView>> page(@Valid UserPageQuery query,
                                                   @AuthenticationPrincipal UserPrincipal principal) {
-        return Result.ok(adminUserService.page(query, operatorId(principal)));
+        return Result.ok(adminUserService.page(query, PrincipalHelper.operatorId(principal)));
     }
 
     /**
@@ -66,7 +65,7 @@ public class AdminUserController {
     @PreAuthorize("@permissionChecker.has('system:user:view')")
     public Result<AdminUserView> detail(@PathVariable long id,
                                         @AuthenticationPrincipal UserPrincipal principal) {
-        return Result.ok(adminUserService.detail(id, operatorId(principal)));
+        return Result.ok(adminUserService.detail(id, PrincipalHelper.operatorId(principal)));
     }
 
     /**
@@ -82,7 +81,7 @@ public class AdminUserController {
     public Result<CreatedUserResult> create(@Valid @RequestBody CreateUserForm form,
                                             @AuthenticationPrincipal UserPrincipal principal,
                                             HttpServletRequest request) {
-        return Result.ok(adminUserService.create(form, operatorId(principal), IpUtil.clientIp(request)));
+        return Result.ok(adminUserService.create(form, PrincipalHelper.operatorId(principal), IpUtil.clientIp(request)));
     }
 
     /**
@@ -100,7 +99,7 @@ public class AdminUserController {
                                         @Valid @RequestBody UpdateUserForm form,
                                         @AuthenticationPrincipal UserPrincipal principal,
                                         HttpServletRequest request) {
-        return Result.ok(adminUserService.update(id, form, operatorId(principal), IpUtil.clientIp(request)));
+        return Result.ok(adminUserService.update(id, form, PrincipalHelper.operatorId(principal), IpUtil.clientIp(request)));
     }
 
     /**
@@ -116,7 +115,7 @@ public class AdminUserController {
     public Result<Void> delete(@PathVariable long id,
                                @AuthenticationPrincipal UserPrincipal principal,
                                HttpServletRequest request) {
-        adminUserService.delete(id, operatorId(principal), IpUtil.clientIp(request));
+        adminUserService.delete(id, PrincipalHelper.operatorId(principal), IpUtil.clientIp(request));
         return Result.ok();
     }
 
@@ -133,7 +132,7 @@ public class AdminUserController {
     public Result<ResetPasswordResult> resetPassword(@PathVariable long id,
                                                      @AuthenticationPrincipal UserPrincipal principal,
                                                      HttpServletRequest request) {
-        return Result.ok(adminUserService.resetPassword(id, operatorId(principal), IpUtil.clientIp(request)));
+        return Result.ok(adminUserService.resetPassword(id, PrincipalHelper.operatorId(principal), IpUtil.clientIp(request)));
     }
 
     /**
@@ -151,7 +150,7 @@ public class AdminUserController {
                                              @Valid @RequestBody AssignRolesForm form,
                                              @AuthenticationPrincipal UserPrincipal principal,
                                              HttpServletRequest request) {
-        return Result.ok(adminUserService.assignRoles(id, form, operatorId(principal), IpUtil.clientIp(request)));
+        return Result.ok(adminUserService.assignRoles(id, form, PrincipalHelper.operatorId(principal), IpUtil.clientIp(request)));
     }
 
     /**
@@ -167,18 +166,7 @@ public class AdminUserController {
     public Result<Void> kick(@PathVariable long id,
                              @AuthenticationPrincipal UserPrincipal principal,
                              HttpServletRequest request) {
-        adminUserService.kick(id, operatorId(principal), IpUtil.clientIp(request));
+        adminUserService.kick(id, PrincipalHelper.operatorId(principal), IpUtil.clientIp(request));
         return Result.ok();
-    }
-
-    private long operatorId(UserPrincipal principal) {
-        if (principal == null) {
-            throw new BizException(ErrorCode.GW_UNAUTHENTICATED);
-        }
-        try {
-            return Long.parseLong(principal.getUserId());
-        } catch (NumberFormatException e) {
-            throw new BizException(ErrorCode.GW_UNAUTHENTICATED);
-        }
     }
 }

@@ -35,11 +35,17 @@ public class IamPermission {
     /** MENU：页面组件路径。 */
     private String component;
 
+    /** MENU：前端图标标识。 */
+    private String icon;
+
     /** API：接口匹配模式。 */
     private String apiPattern;
 
     private Integer sort;
     private String status;
+
+    /** 乐观锁版本（A-15 修改权限使用）。 */
+    private Integer version;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

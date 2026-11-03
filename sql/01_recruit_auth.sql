@@ -61,9 +61,11 @@ CREATE TABLE iam_permission (
   name            VARCHAR(64)  NOT NULL,
   route_path      VARCHAR(255) NULL,               -- MENU：前端路由
   component       VARCHAR(255) NULL,               -- MENU：页面组件路径
+  icon            VARCHAR(64)  NULL,               -- MENU：前端图标标识
   api_pattern     VARCHAR(255) NULL,               -- API：如 /api/interview/applications/**
   sort            INT           NOT NULL DEFAULT 0,
   status          VARCHAR(16)   NOT NULL DEFAULT 'ACTIVE',
+  version         INT           NOT NULL DEFAULT 0, -- 乐观锁版本
   created_at      DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at      DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
