@@ -49,6 +49,9 @@ public class Interview {
     /** 排期备注（面试须知等）。 */
     private String note;
 
+    /** room.create.failed 原因（人工重试排查）。 */
+    private String roomFailReason;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;

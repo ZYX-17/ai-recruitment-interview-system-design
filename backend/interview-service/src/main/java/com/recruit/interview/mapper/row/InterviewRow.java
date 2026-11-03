@@ -37,6 +37,8 @@ public class InterviewRow {
 
     private String note;
 
+    private String roomFailReason;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;

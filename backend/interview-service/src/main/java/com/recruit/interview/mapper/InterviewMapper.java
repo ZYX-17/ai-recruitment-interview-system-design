@@ -70,6 +70,31 @@ public interface InterviewMapper extends BaseMapper<Interview> {
                           @Param("version") int version);
 
     /**
+     * 房间创建成功回执：ROOM_PENDING → SCHEDULED 并回填 room_id。
+     *
+     * <p>只更新 ROOM_PENDING：晚到的 room.created 不得把 CANCELLED/COMPLETED 拉回。</p>
+     */
+    @Update("UPDATE interview SET room_id = #{roomId}, status = 'SCHEDULED', "
+            + "room_fail_reason = NULL, version = version + 1, updated_at = CURRENT_TIMESTAMP(3) "
+            + "WHERE id = #{id} AND status = 'ROOM_PENDING'")
+    int markRoomCreated(@Param("id") long id, @Param("roomId") long roomId);
+
+    /**
+     * 建房失败：保持 ROOM_PENDING，记录原因供人工重试。
+     */
+    @Update("UPDATE interview SET room_fail_reason = #{reason}, version = version + 1, "
+            + "updated_at = CURRENT_TIMESTAMP(3) WHERE id = #{id} AND status = 'ROOM_PENDING'")
+    int markRoomFailed(@Param("id") long id, @Param("reason") String reason);
+
+    /**
+     * 房间结束：面试置 COMPLETED（幂等；不把 CANCELLED/NO_SHOW 改回完成）。
+     */
+    @Update("UPDATE interview SET status = 'COMPLETED', version = version + 1, "
+            + "updated_at = CURRENT_TIMESTAMP(3) "
+            + "WHERE id = #{id} AND status IN ('ROOM_PENDING','SCHEDULED','IN_PROGRESS')")
+    int markCompleted(@Param("id") long id);
+
+    /**
      * 排期分页查询。
      *
      * @param status        状态，可为空

@@ -115,6 +115,7 @@ CREATE TABLE interview (
   status          VARCHAR(16)   NOT NULL DEFAULT 'SCHEDULED', -- ROOM_PENDING/SCHEDULED/IN_PROGRESS/COMPLETED/CANCELLED/NO_SHOW
   cancel_reason   VARCHAR(255)  NULL,
   note            VARCHAR(500)  NULL,          -- 排期备注（面试须知等），V1_1 新增
+  room_fail_reason VARCHAR(255) NULL,          -- room.create.failed 原因（V1_4）
   created_at      DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at      DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   version         INT           NOT NULL DEFAULT 0,
@@ -189,11 +190,13 @@ CREATE TABLE evaluation_dimension (
 CREATE TABLE interview_minutes (
   id                   BIGINT UNSIGNED NOT NULL,
   interview_id         BIGINT UNSIGNED NOT NULL,
+  ai_task_id           VARCHAR(64)   NULL,          -- ai-service 任务 ID（回调幂等，V1_4）
   transcript_object_key VARCHAR(255) NULL,          -- 转写全文对象键（MinIO）
   transcript_segment_count INT      NOT NULL DEFAULT 0, -- 转写片段数，0 则标 INSUFFICIENT_TRANSCRIPT
   minutes_md           MEDIUMTEXT    NULL,          -- 纪要 Markdown 草稿
   ai_evaluation        JSON          NULL,          -- AI 提取的要点/风险/建议
   review_status        VARCHAR(16)   NOT NULL DEFAULT 'PENDING', -- PENDING/CONFIRMED/REJECTED/INSUFFICIENT_TRANSCRIPT
+  review_comment       VARCHAR(1024) NULL,          -- 确认/驳回意见（V1_4）
   reviewer_id          BIGINT UNSIGNED NULL,
   reviewed_at          DATETIME(3)   NULL,
   model                VARCHAR(64)   NULL,
@@ -202,8 +205,25 @@ CREATE TABLE interview_minutes (
   updated_at           DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   version              INT           NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
-  UNIQUE KEY uk_interview (interview_id)
+  UNIQUE KEY uk_interview (interview_id),
+  UNIQUE KEY uk_ai_task (ai_task_id)
 ) COMMENT='AI 会议纪要表（AI 只做草稿，经人工复核确认）';
+
+-- ----------------------------------------------------------------------------
+-- 9.1 面试录像登记（recording.completed 消费，V1_4）
+-- ----------------------------------------------------------------------------
+CREATE TABLE interview_recording (
+  id           BIGINT UNSIGNED NOT NULL,
+  interview_id BIGINT UNSIGNED NOT NULL,
+  room_id      BIGINT UNSIGNED NULL,
+  record_id    VARCHAR(64)  NOT NULL,
+  file_key     VARCHAR(255) NOT NULL,
+  duration_sec INT           NULL,
+  created_at   DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_record (record_id),
+  KEY idx_interview (interview_id)
+) COMMENT='面试录像登记表（recording.completed 消费）';
 
 -- ----------------------------------------------------------------------------
 -- 10. Offer（确认走无登录 confirm_token，CAS 更新防并发重复确认）

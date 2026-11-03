@@ -21,6 +21,9 @@ public class InterviewMinutes {
 
     private Long interviewId;
 
+    /** ai-service 任务 ID（回调幂等）。 */
+    private String aiTaskId;
+
     private String transcriptObjectKey;
 
     private Integer transcriptSegmentCount;
@@ -30,6 +33,9 @@ public class InterviewMinutes {
     private String aiEvaluation;
 
     private String reviewStatus;
+
+    /** 确认/驳回意见。 */
+    private String reviewComment;
 
     private Long reviewerId;
 

@@ -2,6 +2,8 @@ package com.recruit.interview.mapper;
 
 import com.recruit.interview.entity.Job;
 import com.recruit.interview.mapper.AsyncPaperMapper;
+import com.recruit.interview.mapper.InterviewMapper;
+import com.recruit.interview.mapper.InterviewMinutesMapper;
 import com.recruit.interview.support.ScheduleParticipant;
 import com.recruit.interview.support.ScheduleSlotKey;
 import org.apache.ibatis.annotations.Select;
@@ -221,6 +223,47 @@ class MapperSqlRenderingTest {
                 params("id", 93001L, "totalScore", new java.math.BigDecimal("85.00"),
                         "reviewedBy", 10001L, "reviewedAt", LocalDateTime.now(), "version", 2));
         assertThat(with).contains("reviewed_by = ?").contains("reviewed_at = ?");
+    }
+
+    @Test
+    void roomCreatedOnlyTouchesRoomPending() throws Exception {
+        String sql = render(InterviewMapper.class, "markRoomCreated", Map.class,
+                params("id", 91001L, "roomId", 70001L));
+
+        assertThat(sql).contains("room_id = ?").contains("status = 'SCHEDULED'")
+                .contains("WHERE id = ? AND status = 'ROOM_PENDING'");
+    }
+
+    @Test
+    void roomFinishedDoesNotRevertTerminalStatus() throws Exception {
+        String sql = render(InterviewMapper.class, "markCompleted", Map.class, params("id", 91001L));
+
+        assertThat(sql).contains("status = 'COMPLETED'")
+                .contains("status IN ('ROOM_PENDING','SCHEDULED','IN_PROGRESS')");
+    }
+
+    @Test
+    void minutesReviewUsesVersionAndOpenStatusGuard() throws Exception {
+        String sql = render(InterviewMinutesMapper.class, "review", Map.class,
+                params("id", 95001L, "reviewStatus", "CONFIRMED", "comment", "ok",
+                        "reviewerId", 10001L, "reviewedAt", LocalDateTime.now(), "version", 2));
+
+        assertThat(sql).contains("review_status = ?").contains("review_comment = ?")
+                .contains("version = version + 1")
+                .contains("review_status IN ('PENDING','INSUFFICIENT_TRANSCRIPT')");
+    }
+
+    @Test
+    void minutesAiRewriteKeepsConfirmedRowsUntouched() throws Exception {
+        String sql = render(InterviewMinutesMapper.class, "updateFromAi", Map.class,
+                params("id", 95001L, "aiTaskId", "task-1", "transcriptObjectKey", "k",
+                        "transcriptSegmentCount", 12, "minutesMd", "# md",
+                        "aiEvaluation", "{}", "reviewStatus", "PENDING",
+                        "model", "mock-llm", "promptVersion", 1, "version", 0));
+
+        assertThat(sql).contains("ai_task_id = ?").contains("transcript_segment_count = ?")
+                .contains("version = version + 1")
+                .contains("review_status IN ('PENDING','INSUFFICIENT_TRANSCRIPT')");
     }
 
     private static String render(Class<?> mapper, String methodName, Class<?> parameterType,
