@@ -266,6 +266,73 @@ class MapperSqlRenderingTest {
                 .contains("review_status IN ('PENDING','INSUFFICIENT_TRANSCRIPT')");
     }
 
+    @Test
+    void statsStageCountsRendersScopeAndJobFilter() throws Exception {
+        String sql = render(StatsMapper.class, "selectStageCounts", Map.class,
+                params("from", LocalDateTime.now(), "to", LocalDateTime.now().plusDays(1),
+                        "jobId", 50001L, "scope", "DEPARTMENT",
+                        "deptIds", List.of(20001L), "userId", 10001L));
+
+        assertThat(sql).contains("FROM application_stage_history h")
+                .contains("a.job_id = ?").contains("j.dept_id IN")
+                .doesNotContain("j.owner_hr_id = ?");
+    }
+
+    @Test
+    void statsWorkloadRendersJsonTableAndInterviewerThemSelf() throws Exception {
+        String sql = render(StatsMapper.class, "selectWorkload", Map.class,
+                params("from", LocalDateTime.now(), "to", LocalDateTime.now().plusDays(1),
+                        "interviewerId", null, "scope", "ASSIGNED",
+                        "deptIds", List.of(), "userId", 10002L));
+
+        assertThat(sql).contains("JSON_TABLE(i.interviewer_ids")
+                .contains("i.status <> 'CANCELLED'")
+                .contains("jt.interviewer_id = ?")
+                .doesNotContain("j.owner_hr_id = ?")
+                .contains("ORDER BY total DESC");
+    }
+
+    @Test
+    void statsTimeToHireRendersHiredSubqueryAndOwnerScope() throws Exception {
+        String sql = render(StatsMapper.class, "selectTimeToHire", Map.class,
+                params("from", LocalDateTime.now(), "to", LocalDateTime.now().plusDays(1),
+                        "jobId", null, "scope", "SELF",
+                        "deptIds", List.of(), "userId", 10001L));
+
+        assertThat(sql).contains("TIMESTAMPDIFF(MINUTE")
+                .contains("status = 'HIRED' OR stage_no = 'HIRED'")
+                .contains("j.owner_hr_id = ?");
+    }
+
+    @Test
+    void outboxPendingScanFiltersDueMessages() throws Exception {
+        String sql = render(LocalMessageMapper.class, "selectPendingForRelay", Map.class,
+                params("now", LocalDateTime.now(), "limit", 100));
+
+        assertThat(sql).contains("status = 'PENDING'")
+                .contains("next_retry_at IS NULL OR next_retry_at <=")
+                .contains("ORDER BY id LIMIT ?");
+    }
+
+    @Test
+    void outboxPageRendersStatusAndEventTypeFilters() throws Exception {
+        String sql = render(LocalMessageMapper.class, "selectOutboxPage", Map.class,
+                params("status", "DEAD", "eventType", "interview.scheduled",
+                        "limit", 20, "offset", 0L));
+
+        assertThat(sql).contains("status = ?").contains("event_type = ?")
+                .contains("ORDER BY created_at DESC");
+    }
+
+    @Test
+    void outboxReplayOnlyAllowsDeadOrFailed() throws Exception {
+        String sql = render(LocalMessageMapper.class, "replay", Map.class,
+                params("id", 11L, "now", LocalDateTime.now()));
+
+        assertThat(sql).contains("status = 'PENDING'")
+                .contains("status IN ('DEAD','FAILED')");
+    }
+
     private static String render(Class<?> mapper, String methodName, Class<?> parameterType,
                                  Object parameters) throws Exception {
         Method method = findMethod(mapper, methodName);

@@ -65,6 +65,13 @@ recruit:
   interview:
     # 房间页前缀：邀约 joinUrl = 前缀 + /{roomId}（room.created 回填后才发邀约）
     join-base-url: ${INTERVIEW_JOIN_BASE_URL:http://localhost:5173/room}
+  outbox:
+    # Outbox 投递扫描：confirm 成功置 SENT，失败退避 1/2/4/8/16 分钟，超过上限置 DEAD
+    enabled: ${OUTBOX_ENABLED:true}
+    scan-interval-ms: ${OUTBOX_SCAN_INTERVAL_MS:5000}
+    initial-delay-ms: ${OUTBOX_INITIAL_DELAY_MS:5000}
+    batch-size: ${OUTBOX_BATCH_SIZE:100}
+    max-retry: ${OUTBOX_MAX_RETRY:5}
   async:
     # 门户异步面试邀请链接前缀；明文 token 只拼在链接里，不落库/不进 MQ
     invite-base-url: ${ASYNC_INVITE_BASE_URL:http://localhost:5173/portal/async-interview}
