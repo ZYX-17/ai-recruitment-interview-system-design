@@ -77,6 +77,18 @@ class JwtAuthGlobalFilterTest {
     }
 
     @Test
+    void portalOfferRespondWhitelistSkipsVerification() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/interview/portal/offers/token-abc/respond").build());
+        AtomicReference<ServerWebExchange> downstream = new AtomicReference<>();
+
+        filter.filter(exchange, capture(downstream)).block();
+
+        assertNotNull(downstream.get());
+        verifyNoInteractions(jwtVerifier, tokenStateChecker);
+    }
+
+    @Test
     void portalApplicationsStillRequireLogin() throws Exception {
         MockServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/interview/portal/applications").build());

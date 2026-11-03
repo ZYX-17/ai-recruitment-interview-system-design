@@ -48,6 +48,7 @@ public class JwtAuthGlobalFilter implements GlobalFilter, Ordered {
             new WhitelistRule(HttpMethod.GET, "/api/interview/portal/jobs"),
             new WhitelistRule(HttpMethod.GET, "/api/interview/portal/jobs/**"),
             new WhitelistRule(null, "/api/interview/portal/offers/*"),
+            new WhitelistRule(null, "/api/interview/portal/offers/*/**"),
             new WhitelistRule(null, "/api/interview/portal/async-invites/*"),
             new WhitelistRule(null, "/api/interview/portal/async-invites/*/**")
     );

@@ -5,6 +5,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.openfeign.EnableFeignClients;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * 面试管理子系统（Owner：A）。库：recruit_interview。
@@ -13,6 +14,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
  */
 @EnableFeignClients
 @EnableDiscoveryClient
+@EnableScheduling
 @MapperScan("com.recruit.interview.mapper")
 @SpringBootApplication
 public class InterviewServiceApplication {

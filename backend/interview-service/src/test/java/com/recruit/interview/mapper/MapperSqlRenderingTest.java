@@ -161,6 +161,27 @@ class MapperSqlRenderingTest {
                 .contains("WHERE id = ? AND version = ? AND status = 'SUBMITTED'");
     }
 
+    @Test
+    void offerPageRendersScopeAndKeyword() throws Exception {
+        String sql = render(OfferMapper.class, "selectOfferPage", Map.class,
+                params("keyword", "张", "status", "SENT", "jobId", 50001L,
+                        "scope", "DEPARTMENT", "deptIds", List.of(20001L),
+                        "userId", 10001L, "limit", 20, "offset", 0L));
+
+        assertThat(sql).contains("JOIN application a ON a.id = o.application_id")
+                .contains("o.offer_no LIKE").contains("j.dept_id IN")
+                .doesNotContain("j.owner_hr_id = ?");
+    }
+
+    @Test
+    void offerExpireScanUsesStatusAndTimeGuard() throws Exception {
+        String sql = render(OfferMapper.class, "markExpired", Map.class,
+                params("id", 92001L, "version", 2));
+
+        assertThat(sql).contains("status = 'EXPIRED'").contains("version = version + 1")
+                .contains("status = 'SENT' AND expire_at < CURRENT_TIMESTAMP(3)");
+    }
+
     private static String render(Class<?> mapper, String methodName, Class<?> parameterType,
                                  Object parameters) throws Exception {
         Method method = findMethod(mapper, methodName);

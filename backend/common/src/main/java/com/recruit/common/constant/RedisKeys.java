@@ -71,6 +71,16 @@ public final class RedisKeys {
     /** ASR 短时令牌（scope=asr，5min）：asr:token:{sessionId} */
     public static final String ASR_TOKEN = "asr:token:";
 
+    // ==================== Offer ====================
+
+    /**
+     * Offer 确认链接短缓存：offer:confirm:{offerId}，TTL 10 分钟。
+     *
+     * <p>只缓存可点击链接（含明文 token），供 notify 通过内部接口现取；
+     * 禁止写入 MQ/Outbox 或日志。</p>
+     */
+    public static final String OFFER_CONFIRM = "offer:confirm:";
+
     // ==================== 幂等 ====================
 
     /**
@@ -180,6 +190,16 @@ public final class RedisKeys {
      */
     public static String authRate(String scope, String key) {
         return AUTH_RATE + requireSegment(scope, "scope") + ":" + requireText(key, "key");
+    }
+
+    /**
+     * 构造 Offer 确认链接缓存 Key。
+     *
+     * @param offerId Offer ID，不能为空
+     * @return offer:confirm:{offerId}
+     */
+    public static String offerConfirm(String offerId) {
+        return OFFER_CONFIRM + requireSegment(offerId, "offerId");
     }
 
     /**
