@@ -66,6 +66,31 @@ public class PermissionService {
     }
 
     /**
+     * 查询用户数据范围（docs/4 §7.3）。
+     *
+     * <p>多角色取最宽范围：ALL &gt; DEPARTMENT &gt; ASSIGNED &gt; SELF；
+     * 没有角色或角色未配置时按 SELF（最小权限）处理。</p>
+     *
+     * @param userId 用户 ID
+     * @return ALL/DEPARTMENT/ASSIGNED/SELF
+     */
+    public String dataScope(Long userId) {
+        if (userId == null) {
+            return "SELF";
+        }
+        List<String> scopes = roleMapper.selectActiveDataScopesByUserId(userId);
+        if (scopes == null || scopes.isEmpty()) {
+            return "SELF";
+        }
+        for (String scope : List.of("ALL", "DEPARTMENT", "ASSIGNED", "SELF")) {
+            if (scopes.contains(scope)) {
+                return scope;
+            }
+        }
+        return "SELF";
+    }
+
+    /**
      * 查询用户生效的权限码（带版本化缓存）。
      *
      * @param userId 用户 ID

@@ -1,5 +1,6 @@
 package com.recruit.auth.config;
 
+import com.recruit.auth.security.InternalTokenFilter;
 import com.recruit.auth.security.JwtAuthenticationFilter;
 import com.recruit.auth.security.RestAccessDeniedHandler;
 import com.recruit.auth.security.RestAuthenticationEntryPoint;
@@ -51,6 +52,7 @@ public class SecurityConfig {
     };
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final InternalTokenFilter internalTokenFilter;
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
 
@@ -76,13 +78,29 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
-                        .requestMatchers("/internal/**").denyAll()
+                        // /internal/** 由 InternalTokenFilter 校验 X-Internal-Token（网关已对公网屏蔽）
+                        .requestMatchers("/internal/**").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(internalTokenFilter, JwtAuthenticationFilter.class);
         return http.build();
+    }
+
+    /**
+     * 内部接口令牌过滤器也只挂在 Security 链上，避免容器级重复执行。
+     *
+     * @param filter 内部令牌过滤器
+     * @return 禁用状态的注册信息
+     */
+    @Bean
+    public FilterRegistrationBean<InternalTokenFilter> internalTokenFilterRegistration(
+            InternalTokenFilter filter) {
+        FilterRegistrationBean<InternalTokenFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     /**

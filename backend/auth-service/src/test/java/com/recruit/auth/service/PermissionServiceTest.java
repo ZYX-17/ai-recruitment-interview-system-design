@@ -55,6 +55,21 @@ class PermissionServiceTest {
     }
 
     @Test
+    void dataScopePicksWidestRoleScope() {
+        when(roleMapper.selectActiveDataScopesByUserId(3L))
+                .thenReturn(List.of("SELF", "DEPARTMENT", "ASSIGNED"));
+
+        assertEquals("DEPARTMENT", service.dataScope(3L));
+    }
+
+    @Test
+    void dataScopeFallsBackToSelfWithoutRoles() {
+        when(roleMapper.selectActiveDataScopesByUserId(3L)).thenReturn(List.of());
+        assertEquals("SELF", service.dataScope(3L));
+        assertEquals("SELF", service.dataScope(null));
+    }
+
+    @Test
     void permissionCodesReturnsAllForSuperAdmin() {
         when(roleMapper.selectActiveRoleCodesByUserId(1L)).thenReturn(List.of("SUPER_ADMIN"));
         when(permissionMapper.selectAllActivePermissionCodes()).thenReturn(List.of("a", "b"));

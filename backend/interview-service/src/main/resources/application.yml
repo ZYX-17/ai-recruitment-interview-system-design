@@ -31,7 +31,7 @@ spring:
     publisher-confirm-type: correlated   # Outbox publisher confirms
     publisher-returns: true
   flyway:
-    enabled: false   # W1 起改 true；DDL 母版见 sql/02_recruit_interview.sql
+    enabled: true    # V1_0 与 sql/02_recruit_interview.sql 同源
     locations: classpath:db/migration
     baseline-on-migrate: true
 
@@ -57,3 +57,8 @@ management:
 logging:
   pattern:
     level: '%5p [%X{traceId}]'
+
+# 服务间内部接口令牌（/internal/** 必填；未配置时一律 403 fail-closed）
+recruit:
+  security:
+    internal-token: ${INTERNAL_TOKEN:}

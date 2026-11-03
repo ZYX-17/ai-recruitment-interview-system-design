@@ -25,6 +25,18 @@ public interface IamDepartmentMapper extends BaseMapper<IamDepartment> {
     List<IamDepartment> selectAll();
 
     /**
+     * 自身及全部子孙部门 ID（DEPARTMENT 数据范围使用）。
+     *
+     * <p>依赖 {@code ancestors} 祖级路径，避免递归 CTE 在低版本 MySQL 不可用。</p>
+     *
+     * @param deptId 部门 ID
+     * @return 自身 + 子孙部门 ID
+     */
+    @Select("SELECT id FROM iam_department WHERE id = #{deptId} "
+            + "OR CONCAT(',', ancestors, ',') LIKE CONCAT('%,', #{deptId}, ',%')")
+    List<Long> selectSubtreeIds(@Param("deptId") Long deptId);
+
+    /**
      * 统计直接子部门数量。
      *
      * @param parentId 父部门 ID

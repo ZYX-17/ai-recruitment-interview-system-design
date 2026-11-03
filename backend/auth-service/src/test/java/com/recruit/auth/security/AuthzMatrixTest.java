@@ -3,6 +3,7 @@ package com.recruit.auth.security;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.recruit.auth.config.JwtProperties;
 import com.recruit.auth.config.SecurityConfig;
+import com.recruit.auth.config.SecurityProperties;
 import com.recruit.auth.service.PermissionService;
 import com.recruit.auth.service.TokenRevocationService;
 import com.recruit.auth.support.ApiErrorWriter;
@@ -182,6 +183,18 @@ class AuthzMatrixTest {
         }
 
         @Bean
+        SecurityProperties securityProperties() {
+            SecurityProperties properties = new SecurityProperties();
+            properties.setInternalToken("test-internal-token");
+            return properties;
+        }
+
+        @Bean
+        InternalTokenFilter internalTokenFilter(SecurityProperties properties, ApiErrorWriter apiErrorWriter) {
+            return new InternalTokenFilter(properties, apiErrorWriter);
+        }
+
+        @Bean
         PermissionService permissionService() {
             return Mockito.mock(PermissionService.class);
         }
@@ -227,9 +240,10 @@ class AuthzMatrixTest {
         @Bean
         SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                 JwtAuthenticationFilter jwtAuthenticationFilter,
+                                                InternalTokenFilter internalTokenFilter,
                                                 RestAuthenticationEntryPoint entryPoint,
                                                 RestAccessDeniedHandler accessDeniedHandler) throws Exception {
-            return new SecurityConfig(jwtAuthenticationFilter, entryPoint, accessDeniedHandler)
+            return new SecurityConfig(jwtAuthenticationFilter, internalTokenFilter, entryPoint, accessDeniedHandler)
                     .securityFilterChain(http);
         }
 

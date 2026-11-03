@@ -17,6 +17,14 @@ public class SecurityProperties {
     private Login login = new Login();
 
     /**
+     * 服务间内部接口令牌（INTERNAL_TOKEN）。
+     *
+     * <p>为空时 {@code /internal/**} 一律拒绝（fail-closed）；网关侧对公网
+     * {@code /internal/**} 也统一 403，两处同时兜底。</p>
+     */
+    private String internalToken = "";
+
+    /**
      * Refresh Token Cookie 属性。
      */
     @Data
