@@ -272,6 +272,7 @@ W1 冻结的是 **operation 清单**（method + path + operationId + 权限码 +
 | `internal_interview_minutes_write` | POST | `/internal/interviews/{id}/minutes` | ai-service → interview | `X-Internal-Token` |
 | `internal_async_ai_result` | POST | `/internal/async-interviews/answers/{answerId}/ai-result` | ai-service → interview | `X-Internal-Token` |
 | `internal_async_invite_link` | POST | `/internal/async-interviews/{id}/invite-link` | notify → interview | `X-Internal-Token` |
+| `internal_interview_participants` | GET | `/internal/interviews/{id}/participants` | room-service → interview | `X-Internal-Token` |
 
 > 内部接口不建权限码、不进前端 SDK、不在 OpenAPI 暴露；字段与幂等规则见 `docs/4 §1.6`。
 

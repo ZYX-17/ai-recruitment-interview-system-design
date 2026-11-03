@@ -35,6 +35,7 @@ public class RoomEventService {
     private final InterviewMapper interviewMapper;
     private final InterviewRecordingMapper recordingMapper;
     private final IdempotentConsumptionMapper consumptionMapper;
+    private final InterviewNotificationService notificationService;
 
     /**
      * 处理 {@code room.created}：回填 room_id 并置 SCHEDULED。
@@ -54,6 +55,7 @@ public class RoomEventService {
                     interviewId, roomId);
             return;
         }
+        notificationService.publishInvite(interviewMapper.selectRowById(interviewId));
         log.info("room.created 已回填: interviewId={}, roomId={}", interviewId, roomId);
     }
 

@@ -78,13 +78,16 @@ class ScheduleServiceTest {
     private DataScopeService dataScopeService;
     @Mock
     private IdempotencyService idempotencyService;
+    @Mock
+    private InterviewNotificationService notificationService;
 
     private ScheduleService service;
 
     @BeforeEach
     void setUp() {
         service = new ScheduleService(interviewMapper, slotMapper, applicationMapper, jobMapper,
-                outboxPublisher, new ObjectMapper(), dataScopeService, idempotencyService);
+                outboxPublisher, new ObjectMapper(), dataScopeService, idempotencyService,
+                notificationService);
         UserContext.set("10001", List.of("HR_ADMIN"), "HR", "trace");
     }
 
@@ -263,6 +266,8 @@ class ScheduleServiceTest {
         InterviewRescheduledPayload payload = (InterviewRescheduledPayload) payloadCaptor.getValue();
         assertThat(payload.oldStartTime()).isEqualTo(Instant.parse("2026-10-20T01:00:00Z"));
         assertThat(payload.newStartTime()).isEqualTo(Instant.parse("2026-10-20T03:00:00Z"));
+        verify(notificationService).publishReschedule(any(InterviewRow.class),
+                eq(LocalDateTime.of(2026, 10, 20, 1, 0)), eq(LocalDateTime.of(2026, 10, 20, 3, 0)));
     }
 
     @Test
@@ -324,6 +329,31 @@ class ScheduleServiceTest {
                 eq("interview"), payloadCaptor.capture());
         InterviewCancelledPayload payload = (InterviewCancelledPayload) payloadCaptor.getValue();
         assertThat(payload.reason()).isEqualTo("候选人临时有事");
+        verify(notificationService).publishCancelled(any(InterviewRow.class), eq("候选人临时有事"));
+    }
+
+    @Test
+    void participantsReturnsCandidateInterviewersAndRoom() {
+        InterviewRow row = row(ScheduleService.STATUS_SCHEDULED, 3);
+        row.setRoomId(70001L);
+        when(interviewMapper.selectRowById(90001L)).thenReturn(row);
+
+        var view = service.participants(90001L);
+
+        assertThat(view.interviewId()).isEqualTo("90001");
+        assertThat(view.candidateId()).isEqualTo("60001");
+        assertThat(view.interviewerIds()).containsExactly("10002", "10003");
+        assertThat(view.roomId()).isEqualTo("70001");
+        assertThat(view.status()).isEqualTo(ScheduleService.STATUS_SCHEDULED);
+    }
+
+    @Test
+    void participantsRejectsMissingInterview() {
+        when(interviewMapper.selectRowById(90001L)).thenReturn(null);
+
+        assertThatThrownBy(() -> service.participants(90001L))
+                .isInstanceOfSatisfying(BizException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.APP_NOT_FOUND));
     }
 
     @Test

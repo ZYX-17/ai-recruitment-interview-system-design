@@ -14,6 +14,7 @@ import com.recruit.contracts.event.payload.InterviewRescheduledPayload;
 import com.recruit.contracts.event.payload.InterviewScheduledPayload;
 import com.recruit.interview.dto.CalendarEventView;
 import com.recruit.interview.dto.CalendarQuery;
+import com.recruit.interview.dto.InterviewParticipantsView;
 import com.recruit.interview.dto.ConflictCheckForm;
 import com.recruit.interview.dto.ConflictCheckResult;
 import com.recruit.interview.dto.ConflictItemView;
@@ -114,6 +115,7 @@ public class ScheduleService {
     private final ObjectMapper objectMapper;
     private final DataScopeService dataScopeService;
     private final IdempotencyService idempotencyService;
+    private final InterviewNotificationService notificationService;
 
     /**
      * 排期分页。
@@ -162,6 +164,29 @@ public class ScheduleService {
      */
     public ScheduleView detail(long id) {
         return toView(loadVisibleRow(id));
+    }
+
+    /**
+     * 内部进房预检：返回本场面试的候选人/面试官与房间信息（room-service 调用）。
+     *
+     * @param id 面试 ID
+     * @return 参会人视图
+     */
+    public InterviewParticipantsView participants(long id) {
+        InterviewRow row = interviewMapper.selectRowById(id);
+        if (row == null) {
+            throw new BizException(ErrorCode.APP_NOT_FOUND, "面试安排不存在");
+        }
+        return new InterviewParticipantsView(
+                IdSupport.asString(row.getId()),
+                IdSupport.asString(row.getPersonId()),
+                readInterviewerIds(row.getInterviewerIds()),
+                IdSupport.asString(row.getRoomId()),
+                row.getRoomType(),
+                row.getMode(),
+                row.getStatus(),
+                toInstant(row.getStartTime()),
+                toInstant(row.getEndTime()));
     }
 
     /**
@@ -261,6 +286,7 @@ public class ScheduleService {
                             String.valueOf(current.getApplicationId()),
                             toInstant(current.getStartTime()), form.getStartTime(),
                             IdSupport.asString(current.getRoomId()), Instant.now()));
+            notificationService.publishReschedule(current, current.getStartTime(), update.getStartTime());
         }
         return detail(id);
     }
@@ -299,6 +325,7 @@ public class ScheduleService {
                         String.valueOf(current.getApplicationId()),
                         IdSupport.asString(current.getRoomId()),
                         trimToNull(reason), Instant.now()));
+        notificationService.publishCancelled(current, trimToNull(reason));
         return detail(id);
     }
 

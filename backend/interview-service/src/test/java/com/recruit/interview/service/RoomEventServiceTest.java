@@ -11,6 +11,7 @@ import com.recruit.interview.entity.InterviewRecording;
 import com.recruit.interview.mapper.IdempotentConsumptionMapper;
 import com.recruit.interview.mapper.InterviewMapper;
 import com.recruit.interview.mapper.InterviewRecordingMapper;
+import com.recruit.interview.mapper.row.InterviewRow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,12 +44,15 @@ class RoomEventServiceTest {
     private InterviewRecordingMapper recordingMapper;
     @Mock
     private IdempotentConsumptionMapper consumptionMapper;
+    @Mock
+    private InterviewNotificationService notificationService;
 
     private RoomEventService service;
 
     @BeforeEach
     void setUp() {
-        service = new RoomEventService(interviewMapper, recordingMapper, consumptionMapper);
+        service = new RoomEventService(interviewMapper, recordingMapper, consumptionMapper,
+                notificationService);
     }
 
     @Test
@@ -60,6 +64,32 @@ class RoomEventServiceTest {
                 new RoomCreatedPayload("91001", "70001", "ONE_TO_ONE", Instant.now()));
 
         verify(interviewMapper).markRoomCreated(91001L, 70001L);
+    }
+
+    @Test
+    void roomCreatedPublishesInviteFromFreshRow() {
+        when(consumptionMapper.insert(any(IdempotentConsumption.class))).thenReturn(1);
+        when(interviewMapper.markRoomCreated(91001L, 70001L)).thenReturn(1);
+        InterviewRow row = new InterviewRow();
+        row.setId(91001L);
+        row.setRoomId(70001L);
+        when(interviewMapper.selectRowById(91001L)).thenReturn(row);
+
+        service.handleRoomCreated("evt-1",
+                new RoomCreatedPayload("91001", "70001", "ONE_TO_ONE", Instant.now()));
+
+        verify(notificationService).publishInvite(row);
+    }
+
+    @Test
+    void roomCreatedDoesNotPublishInviteWhenTransitionRejected() {
+        when(consumptionMapper.insert(any(IdempotentConsumption.class))).thenReturn(1);
+        when(interviewMapper.markRoomCreated(91001L, 70001L)).thenReturn(0);
+
+        service.handleRoomCreated("evt-1",
+                new RoomCreatedPayload("91001", "70001", "ONE_TO_ONE", Instant.now()));
+
+        verify(notificationService, never()).publishInvite(any());
     }
 
     @Test

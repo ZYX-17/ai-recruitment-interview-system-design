@@ -62,6 +62,9 @@ logging:
 recruit:
   security:
     internal-token: ${INTERNAL_TOKEN:}
+  interview:
+    # 房间页前缀：邀约 joinUrl = 前缀 + /{roomId}（room.created 回填后才发邀约）
+    join-base-url: ${INTERVIEW_JOIN_BASE_URL:http://localhost:5173/room}
   async:
     # 门户异步面试邀请链接前缀；明文 token 只拼在链接里，不落库/不进 MQ
     invite-base-url: ${ASYNC_INVITE_BASE_URL:http://localhost:5173/portal/async-interview}
