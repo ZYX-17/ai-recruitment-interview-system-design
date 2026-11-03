@@ -1,5 +1,6 @@
 package com.recruit.auth.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.recruit.auth.dto.MenuNodeView;
 import com.recruit.auth.entity.IamPermission;
 import com.recruit.auth.mapper.IamPermissionMapper;
@@ -14,20 +15,24 @@ import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * {@link PermissionService} 的权限码、动态菜单与缓存失效测试。
+ * {@link PermissionService} 的权限码缓存、动态菜单与缓存失效测试（不连库、不连 Redis）。
  */
 @ExtendWith(MockitoExtension.class)
 class PermissionServiceTest {
@@ -45,7 +50,8 @@ class PermissionServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new PermissionService(roleMapper, permissionMapper, redisTemplate);
+        service = new PermissionService(roleMapper, permissionMapper, redisTemplate, new ObjectMapper());
+        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
     }
 
     @Test
@@ -63,6 +69,88 @@ class PermissionServiceTest {
         when(permissionMapper.selectActivePermissionCodesByUserId(2L)).thenReturn(List.of("interview:job:view"));
 
         assertEquals(List.of("interview:job:view"), service.permissionCodes(2L));
+    }
+
+    @Test
+    void permissionCodesUsesCachedValueWhenVersionMatches() {
+        when(valueOperations.get("auth:permver:2")).thenReturn("4");
+        when(valueOperations.get("auth:perm:2:4")).thenReturn("[\"cached:a\"]");
+
+        assertEquals(List.of("cached:a"), service.permissionCodes(2L));
+        verify(roleMapper, never()).selectActiveRoleCodesByUserId(2L);
+        verify(permissionMapper, never()).selectActivePermissionCodesByUserId(2L);
+    }
+
+    @Test
+    void permissionCodesTreatsEmptyCachedListAsHit() {
+        when(valueOperations.get("auth:permver:2")).thenReturn("4");
+        when(valueOperations.get("auth:perm:2:4")).thenReturn("[]");
+
+        assertTrue(service.permissionCodes(2L).isEmpty());
+        verify(permissionMapper, never()).selectActivePermissionCodesByUserId(2L);
+    }
+
+    @Test
+    void permissionCodesCachesDatabaseResultWithVersionAndTtl() {
+        when(valueOperations.get("auth:permver:2")).thenReturn("4");
+        when(valueOperations.get("auth:perm:2:4")).thenReturn(null);
+        when(roleMapper.selectActiveRoleCodesByUserId(2L)).thenReturn(List.of("RECRUITER"));
+        when(permissionMapper.selectActivePermissionCodesByUserId(2L)).thenReturn(List.of("a", "b"));
+
+        assertEquals(List.of("a", "b"), service.permissionCodes(2L));
+        verify(valueOperations).set("auth:perm:2:4", "[\"a\",\"b\"]", Duration.ofMinutes(30));
+    }
+
+    @Test
+    void permissionCodesFallsBackToDatabaseWhenRedisIsDown() {
+        when(redisTemplate.opsForValue()).thenThrow(new IllegalStateException("redis down"));
+        when(roleMapper.selectActiveRoleCodesByUserId(2L)).thenReturn(List.of("RECRUITER"));
+        when(permissionMapper.selectActivePermissionCodesByUserId(2L)).thenReturn(List.of("a"));
+
+        assertEquals(List.of("a"), service.permissionCodes(2L));
+    }
+
+    @Test
+    void permissionCodesRepairsMalformedCacheFromDatabase() {
+        when(valueOperations.get("auth:permver:2")).thenReturn("4");
+        when(valueOperations.get("auth:perm:2:4")).thenReturn("not-json");
+        when(roleMapper.selectActiveRoleCodesByUserId(2L)).thenReturn(List.of("RECRUITER"));
+        when(permissionMapper.selectActivePermissionCodesByUserId(2L)).thenReturn(List.of("a"));
+
+        assertEquals(List.of("a"), service.permissionCodes(2L));
+        verify(valueOperations).set("auth:perm:2:4", "[\"a\"]", Duration.ofMinutes(30));
+    }
+
+    @Test
+    void skipsCacheWriteWhenVersionChangesDuringDatabaseLoad() {
+        when(valueOperations.get("auth:permver:2")).thenReturn("0", "1");
+        when(valueOperations.get("auth:perm:2:0")).thenReturn(null);
+        when(roleMapper.selectActiveRoleCodesByUserId(2L)).thenReturn(List.of("RECRUITER"));
+        when(permissionMapper.selectActivePermissionCodesByUserId(2L)).thenReturn(List.of("old"));
+
+        assertEquals(List.of("old"), service.permissionCodes(2L));
+        verify(valueOperations, never()).set(anyString(), anyString(), any(Duration.class));
+    }
+
+    @Test
+    void versionBumpMakesOldCacheUnreachable() {
+        when(valueOperations.get("auth:permver:2")).thenReturn("0");
+        when(valueOperations.get("auth:perm:2:0")).thenReturn("[\"old\"]");
+        assertEquals(List.of("old"), service.permissionCodes(2L));
+
+        // 并发管理员改了角色：版本递增 + 旧 key 删除，旧缓存自此不可达
+        when(valueOperations.increment("auth:permver:2")).thenReturn(1L);
+        when(redisTemplate.keys("auth:perm:2:*")).thenReturn(Set.of("auth:perm:2:0"));
+        service.bumpVersion(2L);
+
+        when(valueOperations.get("auth:permver:2")).thenReturn("1");
+        when(valueOperations.get("auth:perm:2:1")).thenReturn(null);
+        when(roleMapper.selectActiveRoleCodesByUserId(2L)).thenReturn(List.of("RECRUITER"));
+        when(permissionMapper.selectActivePermissionCodesByUserId(2L)).thenReturn(List.of("new"));
+
+        assertEquals(List.of("new"), service.permissionCodes(2L));
+        verify(redisTemplate).delete(Set.of("auth:perm:2:0"));
+        verify(valueOperations).set("auth:perm:2:1", "[\"new\"]", Duration.ofMinutes(30));
     }
 
     @Test
@@ -95,12 +183,25 @@ class PermissionServiceTest {
 
     @Test
     void bumpVersionIncrementsAndDeletesUserCache() {
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.increment("auth:permver:5")).thenReturn(3L);
         when(redisTemplate.keys("auth:perm:5:*")).thenReturn(Set.of("auth:perm:5:2"));
 
         assertEquals(3L, service.bumpVersion(5L));
         verify(redisTemplate).delete(Set.of("auth:perm:5:2"));
+    }
+
+    @Test
+    void bumpVersionsSkipsNullAndDeduplicatesUsers() {
+        when(valueOperations.increment("auth:permver:5")).thenReturn(1L);
+        when(valueOperations.increment("auth:permver:6")).thenReturn(1L);
+        when(redisTemplate.keys("auth:perm:5:*")).thenReturn(Set.of());
+        when(redisTemplate.keys("auth:perm:6:*")).thenReturn(null);
+
+        service.bumpVersions(java.util.Arrays.asList(5L, null, 5L, 6L));
+
+        verify(valueOperations).increment("auth:permver:5");
+        verify(valueOperations).increment("auth:permver:6");
+        verify(redisTemplate, never()).delete(anyCollection());
     }
 
     @Test
