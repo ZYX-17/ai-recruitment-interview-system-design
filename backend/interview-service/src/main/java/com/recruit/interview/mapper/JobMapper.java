@@ -134,4 +134,31 @@ public interface JobMapper extends BaseMapper<Job> {
                       @Param("scope") String scope,
                       @Param("deptIds") List<Long> deptIds,
                       @Param("userId") long userId);
+
+    /**
+     * 门户岗位分页：只返回 PUBLISHED。
+     *
+     * @param keyword 编码/名称模糊词，可为 null
+     * @param limit   每页条数
+     * @param offset  偏移
+     * @return 岗位行
+     */
+    @Select("<script>SELECT j.* FROM job j WHERE j.status = 'PUBLISHED'"
+            + "<if test=\"keyword != null and keyword != ''\"> AND (j.job_code LIKE CONCAT('%', #{keyword}, '%') "
+            + "OR j.title LIKE CONCAT('%', #{keyword}, '%'))</if>"
+            + " ORDER BY j.published_at DESC, j.id DESC LIMIT #{limit} OFFSET #{offset}</script>")
+    List<JobRow> selectPublishedPage(@Param("keyword") String keyword,
+                                     @Param("limit") int limit,
+                                     @Param("offset") long offset);
+
+    /**
+     * 门户岗位总数：条件与 {@link #selectPublishedPage} 一致。
+     *
+     * @param keyword 编码/名称模糊词，可为 null
+     * @return 总条数
+     */
+    @Select("<script>SELECT COUNT(*) FROM job j WHERE j.status = 'PUBLISHED'"
+            + "<if test=\"keyword != null and keyword != ''\"> AND (j.job_code LIKE CONCAT('%', #{keyword}, '%') "
+            + "OR j.title LIKE CONCAT('%', #{keyword}, '%'))</if></script>")
+    long countPublishedPage(@Param("keyword") String keyword);
 }

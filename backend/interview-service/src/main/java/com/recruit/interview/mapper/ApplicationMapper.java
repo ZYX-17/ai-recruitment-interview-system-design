@@ -90,4 +90,33 @@ public interface ApplicationMapper extends BaseMapper<Application> {
                               @Param("scope") String scope,
                               @Param("deptIds") List<Long> deptIds,
                               @Param("userId") long userId);
+
+    /**
+     * 门户“我的投递”分页：只按候选人本人过滤，不套岗位数据范围。
+     *
+     * @param personId 候选人 ID（当前用户）
+     * @param status   状态，可为 null
+     * @param limit    每页条数
+     * @param offset   偏移
+     * @return 投递行
+     */
+    @Select("<script>SELECT a.* FROM application a WHERE a.person_id = #{personId}"
+            + "<if test=\"status != null and status != ''\"> AND a.status = #{status}</if>"
+            + " ORDER BY a.created_at DESC, a.id DESC LIMIT #{limit} OFFSET #{offset}</script>")
+    List<Application> selectPortalPage(@Param("personId") long personId,
+                                       @Param("status") String status,
+                                       @Param("limit") int limit,
+                                       @Param("offset") long offset);
+
+    /**
+     * 门户“我的投递”总数。
+     *
+     * @param personId 候选人 ID
+     * @param status   状态，可为 null
+     * @return 总条数
+     */
+    @Select("<script>SELECT COUNT(*) FROM application a WHERE a.person_id = #{personId}"
+            + "<if test=\"status != null and status != ''\"> AND a.status = #{status}</if></script>")
+    long countPortalPage(@Param("personId") long personId,
+                         @Param("status") String status);
 }

@@ -152,14 +152,27 @@ public class ApplicationService {
      */
     @Transactional
     public ApplicationView create(ApplicationCreateForm form, String key) {
-        if (hasText(key)) {
-            return idempotencyService.execute("interview.application.create", key,
-                    ApplicationView.class, () -> doCreate(form));
-        }
-        return doCreate(form);
+        return create(form, key, null);
     }
 
-    private ApplicationView doCreate(ApplicationCreateForm form) {
+    /**
+     * 创建投递（可带首条历史备注，供门户说明使用）。
+     *
+     * @param form   创建入参
+     * @param key    Idempotency-Key，可为空
+     * @param remark 首次历史备注，可为空
+     * @return 新投递
+     */
+    @Transactional
+    public ApplicationView create(ApplicationCreateForm form, String key, String remark) {
+        if (hasText(key)) {
+            return idempotencyService.execute("interview.application.create", key,
+                    ApplicationView.class, () -> doCreate(form, remark));
+        }
+        return doCreate(form, remark);
+    }
+
+    private ApplicationView doCreate(ApplicationCreateForm form, String remark) {
         long jobId = IdSupport.requireLong(form.getJobId(), "jobId");
         long personId = IdSupport.requireLong(form.getPersonId(), "personId");
         Job job = jobMapper.selectById(jobId);
@@ -205,7 +218,7 @@ public class ApplicationService {
 
         recordHistory(application.getId(), flow.get(0).getStageNo(), 0,
                 ApplicationStateMachine.IN_PROGRESS, ApplicationStateMachine.RESULT_PENDING,
-                "创建投递", operatorId);
+                hasText(remark) ? "创建投递：" + remark.trim() : "创建投递", operatorId);
         Application saved = applicationMapper.selectById(application.getId());
         return toView(saved == null ? application : saved);
     }
@@ -219,14 +232,48 @@ public class ApplicationService {
      */
     @Transactional
     public ApplicationView action(long id, ApplicationActionForm form) {
-        String action = form.getAction() == null
-                ? "" : form.getAction().trim().toUpperCase(Locale.ROOT);
-        if (!ACTIONS.contains(action)) {
-            throw new BizException(ErrorCode.PARAM_INVALID, "不支持的投递动作: " + form.getAction());
-        }
+        String action = normalizeAction(form.getAction());
         actionPermission.require(action);
+        return execute(loadVisible(id), form, action);
+    }
 
-        Application application = loadVisible(id);
+    /**
+     * 门户候选人撤回：只校验投递归属，不要求面试官写权限。
+     *
+     * <p>已撤回按幂等返回；终态（已入职/已淘汰/已转岗）不允许再撤回。</p>
+     *
+     * @param id       投递 ID
+     * @param personId 当前候选人 ID
+     * @return 撤回后的投递
+     */
+    @Transactional
+    public ApplicationView withdrawForCandidate(long id, long personId) {
+        Application application = applicationMapper.selectById(id);
+        if (application == null) {
+            throw new BizException(ErrorCode.APP_NOT_FOUND);
+        }
+        if (!Objects.equals(application.getPersonId(), personId)) {
+            throw new BizException(ErrorCode.AUTH_FORBIDDEN, "无权操作该投递");
+        }
+        if (ApplicationStateMachine.WITHDRAWN.equals(application.getStatus())) {
+            return toView(application);
+        }
+        ApplicationActionForm form = new ApplicationActionForm();
+        form.setAction(ApplicationActionPermission.ACTION_WITHDRAW);
+        form.setVersion(application.getVersion());
+        return execute(application, form, ApplicationActionPermission.ACTION_WITHDRAW);
+    }
+
+    private String normalizeAction(String raw) {
+        String action = raw == null ? "" : raw.trim().toUpperCase(Locale.ROOT);
+        if (!ACTIONS.contains(action)) {
+            throw new BizException(ErrorCode.PARAM_INVALID, "不支持的投递动作: " + raw);
+        }
+        return action;
+    }
+
+    private ApplicationView execute(Application application, ApplicationActionForm form, String action) {
+        long id = application.getId();
         if (!Objects.equals(application.getVersion(), form.getVersion())) {
             throw new BizException(ErrorCode.ILLEGAL_TRANSITION, "版本冲突，请刷新后重试");
         }

@@ -45,6 +45,18 @@ class OutboxAdminServiceTest {
     }
 
     @Test
+    void requireServiceAcceptsInterviewIgnoringCaseAndSpace() {
+        service.requireService(" INTERVIEW ");
+    }
+
+    @Test
+    void requireServiceRejectsOtherService() {
+        assertThatThrownBy(() -> service.requireService("notify"))
+                .isInstanceOfSatisfying(BizException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.PARAM_INVALID));
+    }
+
+    @Test
     void pageNormalizesStatusAndMapsRows() {
         when(messageMapper.countOutboxPage(eq("DEAD"), isNull())).thenReturn(1L);
         when(messageMapper.selectOutboxPage(eq("DEAD"), isNull(), eq(20), eq(0L)))

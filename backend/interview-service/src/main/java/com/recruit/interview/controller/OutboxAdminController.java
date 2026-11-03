@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
  * Outbox 管理端点（X-03/X-12，网关 {@code /api/admin/outbox/interview/**}）。
  */
 @RestController
-@RequestMapping("/api/admin/outbox/interview")
+@RequestMapping("/api/admin/outbox")
 @RequiredArgsConstructor
 public class OutboxAdminController {
 
@@ -30,9 +30,11 @@ public class OutboxAdminController {
      * @param query 过滤与分页
      * @return 分页消息
      */
-    @GetMapping("/messages")
+    @GetMapping("/{service}/messages")
     @PreAuthorize("@permissionChecker.has('system:config:update')")
-    public Result<PageResult<OutboxMessageView>> page(@Valid OutboxPageQuery query) {
+    public Result<PageResult<OutboxMessageView>> page(@PathVariable String service,
+                                                      @Valid OutboxPageQuery query) {
+        outboxAdminService.requireService(service);
         return Result.ok(outboxAdminService.page(query));
     }
 
@@ -42,9 +44,10 @@ public class OutboxAdminController {
      * @param id 消息 ID
      * @return 重放后的消息
      */
-    @PostMapping("/{id}/replay")
+    @PostMapping("/{service}/{id}/replay")
     @PreAuthorize("@permissionChecker.has('system:config:update')")
-    public Result<OutboxMessageView> replay(@PathVariable long id) {
+    public Result<OutboxMessageView> replay(@PathVariable String service, @PathVariable long id) {
+        outboxAdminService.requireService(service);
         return Result.ok(outboxAdminService.replay(id));
     }
 }

@@ -194,4 +194,49 @@ public interface InterviewMapper extends BaseMapper<Interview> {
                                       @Param("deptIds") List<Long> deptIds,
                                       @Param("userId") long userId,
                                       @Param("userIdText") String userIdText);
+
+    /**
+     * 门户面试详情：必须属于当前候选人。
+     *
+     * @param id       面试 ID
+     * @param personId 候选人 ID
+     * @return 行；不属于该候选人时返回 null
+     */
+    @Select("SELECT i.*, a.job_id, a.job_title, a.person_id, a.person_name FROM interview i "
+            + "JOIN application a ON a.id = i.application_id "
+            + "WHERE i.id = #{id} AND a.person_id = #{personId}")
+    InterviewRow selectPortalRowById(@Param("id") long id, @Param("personId") long personId);
+
+    /**
+     * 门户“我的面试”分页。
+     *
+     * @param personId 候选人 ID
+     * @param status   面试状态，可为 null
+     * @param limit    每页条数
+     * @param offset   偏移
+     * @return 面试行
+     */
+    @Select("<script>SELECT i.*, a.job_id, a.job_title, a.person_id, a.person_name FROM interview i "
+            + "JOIN application a ON a.id = i.application_id "
+            + "WHERE a.person_id = #{personId}"
+            + "<if test=\"status != null and status != ''\"> AND i.status = #{status}</if>"
+            + " ORDER BY i.start_time DESC, i.id DESC LIMIT #{limit} OFFSET #{offset}</script>")
+    List<InterviewRow> selectPortalPage(@Param("personId") long personId,
+                                        @Param("status") String status,
+                                        @Param("limit") int limit,
+                                        @Param("offset") long offset);
+
+    /**
+     * 门户“我的面试”总数。
+     *
+     * @param personId 候选人 ID
+     * @param status   面试状态，可为 null
+     * @return 总条数
+     */
+    @Select("<script>SELECT COUNT(*) FROM interview i "
+            + "JOIN application a ON a.id = i.application_id "
+            + "WHERE a.person_id = #{personId}"
+            + "<if test=\"status != null and status != ''\"> AND i.status = #{status}</if></script>")
+    long countPortalPage(@Param("personId") long personId,
+                         @Param("status") String status);
 }

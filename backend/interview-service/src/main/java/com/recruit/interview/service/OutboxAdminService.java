@@ -32,7 +32,24 @@ public class OutboxAdminService {
     private static final Set<String> STATUSES = Set.of(
             "PENDING", "SENT", "CONFIRMED", "FAILED", "DEAD");
 
+    /** 当前已接入 Outbox 管理的服务名。 */
+    private static final String SERVICE_INTERVIEW = "interview";
+
     private final LocalMessageMapper messageMapper;
+
+    /**
+     * 校验路径中的服务名。
+     *
+     * <p>网关按 {@code /api/admin/outbox/{service}/**} 前缀路由到对应服务；
+     * 服务内再校验一次，避免错误路由把其它服务的消息当成本服务数据。</p>
+     *
+     * @param service 路径服务名
+     */
+    public void requireService(String service) {
+        if (service == null || !SERVICE_INTERVIEW.equals(service.trim().toLowerCase(Locale.ROOT))) {
+            throw new BizException(ErrorCode.PARAM_INVALID, "不支持的 Outbox 服务: " + service);
+        }
+    }
 
     /**
      * 管理页列表。

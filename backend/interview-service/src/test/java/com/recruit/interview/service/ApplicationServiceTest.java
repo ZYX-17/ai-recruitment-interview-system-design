@@ -251,6 +251,66 @@ class ApplicationServiceTest {
         assertThat(timeline.get(0).stageName()).isEqualTo("初筛");
     }
 
+    @Test
+    void createKeepsPortalRemarkInInitialHistory() {
+        when(jobMapper.selectById(50001L)).thenReturn(job(50001L, JobService.STATUS_PUBLISHED));
+        when(dataScopeService.current()).thenReturn(allScope());
+        when(applicationMapper.countByJobAndPerson(50001L, 60001L)).thenReturn(0L);
+        when(templateMapper.selectActiveByJobId(50001L)).thenReturn(template());
+        when(applicationMapper.insert(any(Application.class))).thenAnswer(invocation -> {
+            Application application = invocation.getArgument(0);
+            application.setId(51001L);
+            return 1;
+        });
+
+        service.create(createForm(), null, "内推：老同事推荐");
+
+        ArgumentCaptor<ApplicationStageHistory> history =
+                ArgumentCaptor.forClass(ApplicationStageHistory.class);
+        verify(historyMapper).insert(history.capture());
+        assertThat(history.getValue().getComment()).contains("内推：老同事推荐");
+    }
+
+    @Test
+    void portalWithdrawMarksWithdrawnWithoutInterviewPermission() {
+        Application application = application(51001L, 50001L, "SCREEN", 0);
+        application.setPersonId(10006L);
+        when(applicationMapper.selectById(51001L)).thenReturn(application);
+        when(applicationMapper.updateStateWithVersion(any(Application.class))).thenReturn(1);
+        UserContext.set("10006", List.of("CANDIDATE"));
+
+        ApplicationView view = service.withdrawForCandidate(51001L, 10006L);
+
+        assertThat(view.status()).isEqualTo(ApplicationStateMachine.WITHDRAWN);
+        verify(actionPermission, never()).require(org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void portalWithdrawRejectsOtherCandidate() {
+        Application application = application(51001L, 50001L, "SCREEN", 0);
+        application.setPersonId(60001L);
+        when(applicationMapper.selectById(51001L)).thenReturn(application);
+
+        assertThatThrownBy(() -> service.withdrawForCandidate(51001L, 10006L))
+                .isInstanceOfSatisfying(BizException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.AUTH_FORBIDDEN));
+        verify(applicationMapper, never()).updateStateWithVersion(any(Application.class));
+    }
+
+    @Test
+    void portalWithdrawIsIdempotentWhenAlreadyWithdrawn() {
+        Application application = application(51001L, 50001L, "SCREEN", 3);
+        application.setPersonId(10006L);
+        application.setStatus(ApplicationStateMachine.WITHDRAWN);
+        when(applicationMapper.selectById(51001L)).thenReturn(application);
+
+        ApplicationView view = service.withdrawForCandidate(51001L, 10006L);
+
+        assertThat(view.status()).isEqualTo(ApplicationStateMachine.WITHDRAWN);
+        verify(applicationMapper, never()).updateStateWithVersion(any(Application.class));
+        verify(historyMapper, never()).insert(any(ApplicationStageHistory.class));
+    }
+
     private static ApplicationCreateForm createForm() {
         ApplicationCreateForm form = new ApplicationCreateForm();
         form.setJobId("50001");
