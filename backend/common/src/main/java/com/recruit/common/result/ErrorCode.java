@@ -46,6 +46,7 @@ public enum ErrorCode {
     RESOURCE_NOT_FOUND("SYS404", "资源不存在", 404),
     /** 同一个 Idempotency-Key 的首次请求仍在执行，客户端应稍后重试。 */
     IDEMPOTENT_IN_PROGRESS("SYS409", "请求正在处理中，请勿重复提交", 409),
+    VERSION_CONFLICT("SYS412", "数据已被修改，请刷新后重试", 409),
 
     // AUTH1xxx 认证/令牌
     AUTH_LOGIN_FAILED("AUTH1001", "用户名或密码错误", 401),
@@ -72,6 +73,7 @@ public enum ErrorCode {
     APP_NOT_FOUND("ITV3001", "投递不存在", 404),
     SCHEDULE_CONFLICT("ITV3101", "排期冲突：候选人/面试官/资源时间段已被占用", 409),
     ILLEGAL_TRANSITION("ITV3102", "状态流转非法", 409),
+    OFFER_STATE_NOT_ALLOWED("ITV3301", "Offer 已过期或状态不允许", 409),
 
     // ROM4xxx 房间
     ROOM_NOT_FOUND("ROM4001", "房间不存在", 404),
@@ -89,6 +91,10 @@ public enum ErrorCode {
     ASR_OVERLOAD("AIS5101", "ASR 并发已满，实时字幕暂停", 503),
     ANSWER_SUBMITTED("AIS5102", "作答已提交，不可重复提交", 409),
     EMBEDDING_FAILED("AIS5103", "Embedding 失败", 502),
+
+    // NTF6xxx 通知
+    NOTIFY_TEMPLATE_INVALID("NTF6001", "通知模板不存在或变量缺失，渲染失败", 400),
+    NOTIFY_SEND_FAILED("NTF6002", "通知渠道发送失败", 502),
 
     // FIL7xxx 文件
     FILE_NOT_FOUND("FIL7001", "文件不存在", 404),
