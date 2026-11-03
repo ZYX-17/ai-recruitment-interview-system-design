@@ -13,6 +13,7 @@ import java.util.List;
  * @param roles        角色码
  * @param permissions  权限码（登录时按角色现算，P2-6 再加缓存）
  * @param tokenVersion 令牌版本，写入 Access claims
+ * @param mustChangePassword 管理员重置密码后为 true，前端应强制跳转改密页
  */
 public record LoginResult(
         String accessToken,
@@ -22,7 +23,8 @@ public record LoginResult(
         UserSummary user,
         List<String> roles,
         List<String> permissions,
-        long tokenVersion) {
+        long tokenVersion,
+        boolean mustChangePassword) {
 
     public LoginResult {
         roles = roles == null ? List.of() : List.copyOf(roles);
@@ -35,6 +37,7 @@ public record LoginResult(
      * @return 新的响应对象，refreshToken 为 null
      */
     public LoginResult withoutRefreshToken() {
-        return new LoginResult(accessToken, tokenType, expiresIn, null, user, roles, permissions, tokenVersion);
+        return new LoginResult(accessToken, tokenType, expiresIn, null, user, roles, permissions,
+                tokenVersion, mustChangePassword);
     }
 }

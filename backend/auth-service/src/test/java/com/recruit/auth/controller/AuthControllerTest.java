@@ -233,7 +233,7 @@ class AuthControllerTest {
     private static LoginResult result(String refreshToken) {
         UserSummary user = new UserSummary("10001", "hr01", "招聘专员", "EMPLOYEE", null, null, null);
         return new LoginResult("access-token", "Bearer", 7200, refreshToken, user,
-                List.of("RECRUITER"), List.of("interview:job:view"), 3);
+                List.of("RECRUITER"), List.of("interview:job:view"), 3, false);
     }
 
     private static RefreshResult refreshResult() {

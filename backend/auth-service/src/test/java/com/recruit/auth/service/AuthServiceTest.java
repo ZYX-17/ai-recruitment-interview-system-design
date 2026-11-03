@@ -68,6 +68,8 @@ class AuthServiceTest {
     private ValueOperations<String, String> valueOperations;
     @Mock
     private TokenRevocationService tokenRevocationService;
+    @Mock
+    private MustChangePasswordService mustChangePasswordService;
 
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(4);
     private AuthService authService;
@@ -76,7 +78,7 @@ class AuthServiceTest {
     void setUp() {
         authService = new AuthService(userMapper, departmentMapper, permissionService, tokenService,
                 refreshSessionService, loginAttemptService, auditService, passwordEncoder, redisTemplate,
-                tokenRevocationService);
+                tokenRevocationService, mustChangePasswordService);
     }
 
     @Test

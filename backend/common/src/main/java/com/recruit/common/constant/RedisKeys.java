@@ -40,6 +40,14 @@ public final class RedisKeys {
     public static final String AUTH_PERM = "auth:perm:";
 
     /**
+     * 管理员重置密码后的强制改密标记：auth:mustchg:{userId}。
+     *
+     * <p>登录响应把 {@code mustChangePassword=true} 下发给前端；用户自助改密成功后删除。
+     * 标记带 TTL，过期后用户仍可正常登录，避免 Redis 残留永久锁死账号。</p>
+     */
+    public static final String AUTH_MUST_CHANGE_PASSWORD = "auth:mustchg:";
+
+    /**
      * 登录连续失败计数：auth:login:fail:{username}。
      *
      * <p>值等于连续失败次数，TTL 为锁定窗口（默认 15 分钟）；达到阈值即视为锁定，
@@ -151,6 +159,16 @@ public final class RedisKeys {
      */
     public static String authLoginFail(String username) {
         return AUTH_LOGIN_FAIL + requireText(username == null ? null : username.trim().toLowerCase(java.util.Locale.ROOT), "username");
+    }
+
+    /**
+     * 构造强制改密标记 Key。
+     *
+     * @param userId 用户 ID，不能为空
+     * @return auth:mustchg:{userId}
+     */
+    public static String authMustChangePassword(String userId) {
+        return AUTH_MUST_CHANGE_PASSWORD + requireSegment(userId, "userId");
     }
 
     /**

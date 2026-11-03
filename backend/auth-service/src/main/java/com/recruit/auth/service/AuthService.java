@@ -65,6 +65,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final StringRedisTemplate redisTemplate;
     private final TokenRevocationService tokenRevocationService;
+    private final MustChangePasswordService mustChangePasswordService;
 
     /**
      * 登录。
@@ -132,7 +133,8 @@ public class AuthService {
         auditService.recordQuietly(user.getId(), ACTION_LOGIN, RESOURCE_USER, userId, true, ip, detail);
 
         return new LoginResult(accessToken, "Bearer", tokenService.accessTtlSeconds(), refresh.token(),
-                toSummary(user), roles, permissions, tokenVersion);
+                toSummary(user), roles, permissions, tokenVersion,
+                mustChangePasswordService.isMarked(user.getId()));
     }
 
     /**
@@ -252,6 +254,7 @@ public class AuthService {
             throw new BizException(ErrorCode.RESOURCE_NOT_FOUND, "用户不存在");
         }
         tokenRevocationService.revokeAllSessions(userId);
+        mustChangePasswordService.clear(userId);
         auditChangePassword(user.getId(), resourceId, true, request, "OK");
     }
 
