@@ -114,6 +114,7 @@ CREATE TABLE interview (
   room_id         BIGINT UNSIGNED NULL,           -- room-service 回填
   status          VARCHAR(16)   NOT NULL DEFAULT 'SCHEDULED', -- ROOM_PENDING/SCHEDULED/IN_PROGRESS/COMPLETED/CANCELLED/NO_SHOW
   cancel_reason   VARCHAR(255)  NULL,
+  note            VARCHAR(500)  NULL,          -- 排期备注（面试须知等），V1_1 新增
   created_at      DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at      DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   version         INT           NOT NULL DEFAULT 0,

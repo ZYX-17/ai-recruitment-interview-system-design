@@ -1,6 +1,8 @@
 package com.recruit.interview.mapper;
 
 import com.recruit.interview.entity.Job;
+import com.recruit.interview.support.ScheduleParticipant;
+import com.recruit.interview.support.ScheduleSlotKey;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 import org.apache.ibatis.mapping.BoundSql;
@@ -10,6 +12,7 @@ import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -37,7 +40,7 @@ class MapperSqlRenderingTest {
                         "userId", 10001L, "limit", 20, "offset", 0L));
 
         assertThat(sql).contains("FROM job j").contains("j.status = ?")
-                .contains("j.dept_id IN").doesNotContain("j.owner_hr_id");
+                .contains("j.dept_id IN").doesNotContain("j.owner_hr_id = ?");
     }
 
     @Test
@@ -95,6 +98,45 @@ class MapperSqlRenderingTest {
 
         assertThat(sql).contains("title = ?").contains("WHERE id = ? AND version = ?")
                 .contains("version = version + 1");
+    }
+
+    @Test
+    void schedulePageRendersDepartmentScopeAndInterviewerFilter() throws Exception {
+        String sql = render(InterviewMapper.class, "selectSchedulePage", Map.class,
+                params("status", "ROOM_PENDING", "startFrom", LocalDateTime.now(),
+                        "startTo", LocalDateTime.now().plusDays(1), "interviewerId", "10002",
+                        "deptId", null, "scope", "DEPARTMENT", "deptIds", List.of(20001L),
+                        "userId", 10001L, "userIdText", "10001", "limit", 20, "offset", 0L));
+
+        assertThat(sql).contains("JOIN application a ON a.id = i.application_id")
+                .contains("JSON_CONTAINS").contains("j.dept_id IN")
+                .doesNotContain("j.owner_hr_id = ?");
+    }
+
+    @Test
+    void calendarRendersSelfConditionUsingCurrentUser() throws Exception {
+        String sql = render(InterviewMapper.class, "selectCalendar", Map.class,
+                params("startFrom", LocalDateTime.now(), "startTo", LocalDateTime.now().plusDays(1),
+                        "interviewerId", null, "deptId", 20001L,
+                        "scope", "SELF", "deptIds", List.of(), "userId", 10001L,
+                        "userIdText", "10001"));
+
+        assertThat(sql).contains("i.start_time >=").contains("j.owner_hr_id = ?")
+                .contains("JSON_QUOTE(?)").contains("j.dept_id = ?");
+    }
+
+    @Test
+    void slotConflictRendersRecordPropertiesAndExcludes() throws Exception {
+        String sql = render(ScheduleSlotMapper.class, "selectConflicts", Map.class,
+                params("keys", List.of(new ScheduleSlotKey(LocalDate.of(2026, 10, 20), 18),
+                                new ScheduleSlotKey(LocalDate.of(2026, 10, 20), 19)),
+                        "participants", List.of(new ScheduleParticipant("INTERVIEWER", 10002L),
+                                new ScheduleParticipant("CANDIDATE", 60001L)),
+                        "excludeInterviewIds", List.of(90001L)));
+
+        assertThat(sql).contains("s.slot_date = ? AND s.slot_no = ?")
+                .contains("s.participant_type = ? AND s.participant_id = ?")
+                .contains("s.interview_id NOT IN").doesNotContain("${");
     }
 
     private static String render(Class<?> mapper, String methodName, Class<?> parameterType,
