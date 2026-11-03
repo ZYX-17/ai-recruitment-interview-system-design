@@ -1,0 +1,27 @@
+package com.recruit.interview.dto;
+
+import java.time.Instant;
+import java.util.List;
+
+/**
+ * 评价模板视图。
+ *
+ * @param id          模板 ID
+ * @param jobId       岗位 ID
+ * @param templateVer 模板版本
+ * @param stageFlow   阶段定义（沿用流程模板）
+ * @param dimensions  评分维度（读取 {@code evaluation_dimension}）
+ * @param status      ACTIVE / INACTIVE
+ * @param createdAt   创建时间
+ * @param version     版本号
+ */
+public record EvaluationTemplateView(
+        String id,
+        String jobId,
+        Integer templateVer,
+        List<StageDef> stageFlow,
+        List<ScoreDim> dimensions,
+        String status,
+        Instant createdAt,
+        Integer version) {
+}

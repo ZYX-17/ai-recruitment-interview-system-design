@@ -91,6 +91,8 @@ public enum ErrorCode {
     ASR_OVERLOAD("AIS5101", "ASR 并发已满，实时字幕暂停", 503),
     ANSWER_SUBMITTED("AIS5102", "作答已提交，不可重复提交", 409),
     EMBEDDING_FAILED("AIS5103", "Embedding 失败", 502),
+    /** AI 评价草稿依赖转写；转写缺失或片段不足时返回，不影响人工评价。 */
+    INSUFFICIENT_TRANSCRIPT("AIS5104", "转写内容不足，无法生成 AI 草稿", 422),
 
     // NTF6xxx 通知
     NOTIFY_TEMPLATE_INVALID("NTF6001", "通知模板不存在或变量缺失，渲染失败", 400),

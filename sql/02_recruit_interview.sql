@@ -153,8 +153,12 @@ CREATE TABLE evaluation (
   dimension_scores JSON          NOT NULL,         -- {dimCode: score}
   comment          VARCHAR(1024) NULL,
   result           VARCHAR(16)   NOT NULL DEFAULT 'PENDING', -- PASS / FAIL / PENDING
+  status           VARCHAR(16)   NOT NULL DEFAULT 'SUBMITTED', -- SUBMITTED / REOPENED（V1_2）
   template_version INT           NOT NULL DEFAULT 1, -- 对应 job_stage_template.template_ver
   submitted_at     DATETIME(3)   NULL,
+  reopened_by      BIGINT UNSIGNED NULL,          -- 重开人（V1_2）
+  reopened_at      DATETIME(3)   NULL,            -- 重开时间（V1_2）
+  reopen_reason    VARCHAR(255)  NULL,            -- 重开原因（V1_2）
   created_at       DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at       DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   version          INT           NOT NULL DEFAULT 0,

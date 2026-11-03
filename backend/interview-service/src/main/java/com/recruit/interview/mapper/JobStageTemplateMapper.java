@@ -42,6 +42,17 @@ public interface JobStageTemplateMapper extends BaseMapper<JobStageTemplate> {
     JobStageTemplate selectActiveByJobId(@Param("jobId") Long jobId);
 
     /**
+     * 按岗位 + 版本取模板（评价提交校验历史版本）。
+     *
+     * @param jobId       岗位 ID
+     * @param templateVer 模板版本
+     * @return 模板；不存在返回 null
+     */
+    @Select("SELECT * FROM job_stage_template WHERE job_id = #{jobId} AND template_ver = #{templateVer}")
+    JobStageTemplate selectByJobIdAndVer(@Param("jobId") Long jobId,
+                                         @Param("templateVer") Integer templateVer);
+
+    /**
      * 岗位最新版本模板（删除 ACTIVE 后回退使用）。
      *
      * @param jobId 岗位 ID

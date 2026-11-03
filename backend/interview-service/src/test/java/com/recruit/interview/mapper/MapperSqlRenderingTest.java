@@ -139,6 +139,28 @@ class MapperSqlRenderingTest {
                 .contains("s.interview_id NOT IN").doesNotContain("${");
     }
 
+    @Test
+    void myEvaluationTasksRenderAssigneeAndWindow() throws Exception {
+        String sql = render(EvaluationMapper.class, "selectMyTasks", Map.class,
+                params("interviewerId", 10002L, "userIdText", "10002",
+                        "from", LocalDateTime.of(2026, 10, 1, 0, 0),
+                        "to", LocalDateTime.of(2026, 11, 1, 0, 0)));
+
+        assertThat(sql).contains("JSON_CONTAINS(i.interviewer_ids, JSON_QUOTE(?))")
+                .contains("i.start_time >= ?").contains("i.start_time < ?")
+                .contains("LEFT JOIN evaluation e").contains("e.interviewer_id = ?");
+    }
+
+    @Test
+    void evaluationReopenWritesAuditColumnsWithVersionGuard() throws Exception {
+        String sql = render(EvaluationMapper.class, "reopen", Map.class,
+                params("id", 91001L, "reopenedBy", 10001L, "reason", "材料有误", "version", 2));
+
+        assertThat(sql).contains("reopened_by = ?").contains("reopen_reason = ?")
+                .contains("version = version + 1")
+                .contains("WHERE id = ? AND version = ? AND status = 'SUBMITTED'");
+    }
+
     private static String render(Class<?> mapper, String methodName, Class<?> parameterType,
                                  Object parameters) throws Exception {
         Method method = findMethod(mapper, methodName);
