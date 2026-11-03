@@ -108,6 +108,8 @@ public enum ErrorCode {
 
     // GW9xxx 网关
     GW_UNAUTHENTICATED("GW9001", "未认证", 401),
+    /** Redis/下游依赖不可用时网关 fail-closed，不放行请求。 */
+    GW_SERVICE_UNAVAILABLE("GW9002", "网关依赖不可用，请稍后重试", 503),
     GW_RATE_LIMITED("GW9003", "请求过于频繁", 429),
     GW_INTERNAL_FORBIDDEN("GW9005", "内部接口禁止外部访问", 403);
 

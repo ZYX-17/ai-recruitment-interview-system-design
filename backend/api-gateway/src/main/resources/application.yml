@@ -17,18 +17,33 @@ spring:
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Headers Access-Control-Allow-Methods, RETAIN_UNIQUE
       globalcors:
+        add-to-simple-url-handler-mapping: true
         cors-configurations:
           '[/**]':
-            allowedOriginPatterns: "*"
-            allowedMethods: "*"
-            allowedHeaders: "*"
+            # 禁止 * + allowCredentials（docs/4 §11 D13）；按环境配置白名单
+            allowedOrigins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+            allowedMethods: [ GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS ]
+            allowedHeaders: [ Authorization, Content-Type, X-Trace-Id, X-Requested-With, Idempotency-Key ]
+            exposedHeaders: [ X-Trace-Id, Retry-After ]
             allowCredentials: true
+            maxAge: 3600
       routes:
-        # TODO(W2)：在各路由上加 AuthFilterFactory（JWT 验签前置，调 auth-service /internal/auth/verify）
+        # Outbox 重放必须先于 /api/admin/**，否则会被 auth-admin 抢走
+        - id: auth-outbox
+          uri: lb://auth-service
+          predicates: [ "Path=/api/admin/outbox/auth/**" ]
+        - id: interview-outbox
+          uri: lb://interview-service
+          predicates: [ "Path=/api/admin/outbox/interview/**" ]
+        - id: notify-outbox
+          uri: lb://notify-service
+          predicates: [ "Path=/api/admin/outbox/notify/**" ]
+        - id: auth-admin
+          uri: lb://auth-service
+          predicates: [ "Path=/api/admin/**" ]
         - id: auth-service
           uri: lb://auth-service
           predicates: [ "Path=/api/auth/**" ]
-          filters: [ "StripPrefix=0" ]
         - id: interview-service
           uri: lb://interview-service
           predicates: [ "Path=/api/interview/**" ]
@@ -48,8 +63,26 @@ spring:
         - id: ai-service
           uri: ${AI_SERVICE_URI:http://127.0.0.1:9010}
           predicates: [ "Path=/api/ai/**" ]
-      # 限流（令牌桶）：骨架期先放通，W2 接入 RedisRequestRateLimiter
-      # filters: - name: RequestRateLimiter ... key-resolver / redis-rate-limiter
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2s
+
+# 网关鉴权与限流（P3）：公钥由环境变量/Nacos 注入
+recruit:
+  gateway:
+    jwt:
+      issuer: ${JWT_ISSUER:recruit-auth}
+      key-id: ${JWT_KEY_ID:k1}
+      public-key-path: ${JWT_PUBLIC_KEY_PATH:}
+      clock-skew-seconds: 30
+      previous-public-keys: {}
+    rate-limit:
+      global-qps: 200        # 全平台 QPS（docs/4 §10.3 P1）
+      ip-qps: 50             # 单 IP QPS（P2）
+      login-per-minute: 100  # 登录（P3，含失败计数）
 
 management:
   endpoints:

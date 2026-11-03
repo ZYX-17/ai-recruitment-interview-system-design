@@ -10,7 +10,10 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 /**
- * traceId 生成/透传（最高优先级）：无 X-Trace-Id 则生成，写入 MDC 并回写响应头。
+ * traceId 生成与透传（最高优先级）。
+ *
+ * <p><b>不信任客户端传入的 {@code X-Trace-Id}</b>：客户端可以伪造它污染日志或绕过
+ * 链路统计，所以每次入口请求都重新生成，再写入 MDC、请求头和响应头。</p>
  */
 @Component
 public class TraceIdGlobalFilter implements GlobalFilter, Ordered {
@@ -19,15 +22,11 @@ public class TraceIdGlobalFilter implements GlobalFilter, Ordered {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        String traceId = exchange.getRequest().getHeaders().getFirst(TRACE_HEADER);
-        if (traceId == null || traceId.isBlank()) {
-            traceId = TraceIdUtil.generate();
-        } else {
-            TraceIdUtil.put(traceId);
-        }
-        String finalTraceId = traceId;
-        ServerHttpRequest mutated = exchange.getRequest().mutate().header(TRACE_HEADER, finalTraceId).build();
-        exchange.getResponse().getHeaders().set(TRACE_HEADER, finalTraceId);
+        String traceId = TraceIdUtil.generate();
+        ServerHttpRequest mutated = exchange.getRequest().mutate()
+                .headers(headers -> headers.set(TRACE_HEADER, traceId))
+                .build();
+        exchange.getResponse().getHeaders().set(TRACE_HEADER, traceId);
         return chain.filter(exchange.mutate().request(mutated).build())
                 .doFinally(signal -> TraceIdUtil.clear());
     }
