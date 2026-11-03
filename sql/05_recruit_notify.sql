@@ -24,6 +24,8 @@ CREATE TABLE notification (
   error_msg      VARCHAR(512) NULL,
   sent_at        DATETIME(3)  NULL,
   read_at        DATETIME(3)  NULL,                 -- 站内信已读时间
+  retry_count    INT          NOT NULL DEFAULT 0,   -- 已重试次数（上限 3）
+  next_retry_at  DATETIME(3)  NULL,                 -- 下次重试时间（1/5/15 分钟）
   created_at     DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at     DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   version        INT           NOT NULL DEFAULT 0,
@@ -31,7 +33,8 @@ CREATE TABLE notification (
   UNIQUE KEY uk_msg_no (msg_no),
   KEY idx_receiver_status (receiver_id, status),
   KEY idx_biz (biz_type, biz_id),
-  KEY idx_created (created_at)
+  KEY idx_created (created_at),
+  KEY idx_retry (status, next_retry_at)
 ) COMMENT='通知表（验收口径：通知 60s 内达）';
 
 -- ----------------------------------------------------------------------------
@@ -50,7 +53,7 @@ CREATE TABLE notification_template (
   updated_at     DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
   UNIQUE KEY uk_code_channel_ver (template_code, channel, version)
-) COMMENT='通知模板表（模板更新走新增 version 行，旧版本保留）';
+) COMMENT='通知模板表（模板更新新增 version 行，旧行置 ARCHIVED 保留）';
 
 -- ----------------------------------------------------------------------------
 -- 3. 发送日志（失败重试依据；不记敏感内容）

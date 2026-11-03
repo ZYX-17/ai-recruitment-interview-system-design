@@ -99,6 +99,9 @@ flowchart TD
 | `payload/OfferDeclinedPayload.java` | 候选人拒绝 Offer | 带拒绝原因，可为空 |
 | `payload/OfferExpiredPayload.java` | Offer 过期 | 由延迟消息触发 |
 | `payload/NotificationRequestedPayload.java` | 各服务请求 notify 发通知 | 禁止密码、令牌、完整手机号、简历全文 |
+| `payload/ResumeParseFailedPayload.java` | 简历解析失败 → notify（HR 可见） | `receiverId` 为可选接收人；缺失时告警跳过 |
+| `payload/CandidateDuplicatedPayload.java` | 候选人查重 → notify（HR 提醒） | `receiverId` 为可选接收人 |
+| `payload/TalentFollowupDuePayload.java` | 人才回访到期 → notify | `hrId` 即接收人 |
 | `EventRoutingTest.java` | 路由规则单测 | 队列名、DLQ 幂等、非法输入 |
 | `EventSchemaVersionTest.java` | 版本登记完整性单测 | 反射遍历 `EventTypes`，漏登记即失败 |
 | `EventEnvelopeTest.java` | 信封工厂单测 | 自动填版本/时间，未登记事件抛错 |

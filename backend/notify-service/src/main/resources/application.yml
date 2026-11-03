@@ -36,7 +36,7 @@ spring:
           ssl:
             enable: true
   flyway:
-    enabled: false   # W1 起改 true；DDL 母版见 sql/05_recruit_notify.sql
+    enabled: true    # V1_0 与 sql/05_recruit_notify.sql 同源
     locations: classpath:db/migration
     baseline-on-migrate: true
 
@@ -48,6 +48,10 @@ mybatis-plus:
     db-config:
       id-type: assign_id
 
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
 management:
   endpoints:
     web:
@@ -57,3 +61,8 @@ management:
 logging:
   pattern:
     level: '%5p [%X{traceId}]'
+
+# 通知发送开关：false 时邮件只打印日志，站内信仍落库
+recruit:
+  notify:
+    mail-enabled: ${MAIL_ENABLED:true}
