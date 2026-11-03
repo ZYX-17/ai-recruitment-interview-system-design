@@ -11,7 +11,7 @@ W1 冻结的是 **operation 清单**（method + path + operationId + 权限码 +
 
 冻结内容：
 
-1. 105 个 operation 的标识与归属 tag；
+1. 110 个 operation 的标识与归属 tag；
 2. 每个 operation 的权限码（公开接口显式标注）；
 3. 写操作的幂等要求与更新操作的乐观锁要求；
 4. 每个 operation 的错误码（基线 + 域内附加）。
@@ -72,11 +72,11 @@ W1 冻结的是 **operation 清单**（method + path + operationId + 权限码 +
 | interview-evaluation | 11 |
 | interview-minutes | 2 |
 | interview-offer | 6 |
-| interview-async | 6 |
+| interview-async | 10 |
 | interview-stats | 3 |
 | portal | 12 |
 | notify | 5 |
-| **合计** | **106** |
+| **合计** | **110** |
 
 ## 4. auth（tag: auth）
 
@@ -220,6 +220,10 @@ W1 冻结的是 **operation 清单**（method + path + operationId + 权限码 +
 | `interview_async_update` | PUT | `/api/interview/async-interviews/{id}` | `interview:async:update` | version | `ITV3102`（非 DRAFT） |
 | `interview_async_publish` | POST | `/api/interview/async-interviews/{id}/publish` | `interview:async:publish` | 幂等 | `ITV3102` |
 | `interview_async_question_create` | POST | `/api/interview/async-interviews/{id}/questions` | `interview:async:update` | Idempotency-Key | `ITV3102`（非 DRAFT/序号重复） |
+| `interview_async_invite_link` | POST | `/api/interview/async-interviews/{id}/invite-link` | `interview:async:publish` | version | `ITV3102` |
+| `interview_async_answers` | GET | `/api/interview/async-interviews/{id}/answers` | `interview:async:view` | — | `ITV3001` |
+| `interview_async_review` | PUT | `/api/interview/async-interviews/{id}/answers/{answerId}/review` | `interview:async:update` | version | `ITV3102` |
+| `interview_async_reset` | POST | `/api/interview/async-interviews/{id}/reset` | `interview:async:update` | version | `ITV3102` |
 
 ## 13. interview-stats（tag: interview-stats）
 
@@ -266,12 +270,14 @@ W1 冻结的是 **operation 清单**（method + path + operationId + 权限码 +
 |---|---|---|---|---|
 | `internal_offer_confirm_link` | POST | `/internal/offers/{id}/confirm-link` | notify → interview | `X-Internal-Token` |
 | `internal_interview_minutes_write` | POST | `/internal/interviews/{id}/minutes` | ai-service → interview | `X-Internal-Token` |
+| `internal_async_ai_result` | POST | `/internal/async-interviews/answers/{answerId}/ai-result` | ai-service → interview | `X-Internal-Token` |
+| `internal_async_invite_link` | POST | `/internal/async-interviews/{id}/invite-link` | notify → interview | `X-Internal-Token` |
 
 > 内部接口不建权限码、不进前端 SDK、不在 OpenAPI 暴露；字段与幂等规则见 `docs/4 §1.6`。
 
 ## 17. 冻结清单（W1 评审）
 
-- [x] `operationId` 全量唯一（106 个）
+- [x] `operationId` 全量唯一（110 个）
 - [x] 每个非公开 operation 均登记权限码
 - [x] 每个写操作标注 `Idempotency-Key`，每个更新标注 `version`
 - [x] 每个 operation 有「成功 + 400/403/409」示例要求
@@ -285,10 +291,10 @@ W1 冻结的是 **operation 清单**（method + path + operationId + 权限码 +
 | 文档端点组 | 本文 operation 数 | 说明 |
 |---|---:|---|
 | auth 15 组 | 36 | 7 个会话接口（P1-5 增补自助改密）+ 29 个管理端接口（GET/POST/PUT/DELETE 拆分） |
-| interview 22 组 | 53 | I-22 子表（Offer/异步/统计）展开 |
+| interview 22 组 | 57 | I-22 子表（Offer/异步/统计）展开 |
 | notify 4 组 | 5 | 拆分模板列表/更新、增加重发 |
 | portal（附录 C） | 12 | 门户端点独立成 tag |
-| **合计** | **106** | 41 是任务分解口径，不是 operation 上限（§1.5） |
+| **合计** | **110** | 41 是任务分解口径，不是 operation 上限（§1.5） |
 
 ## 19. 变更流程
 

@@ -242,13 +242,22 @@ CREATE TABLE async_paper (
   question_count   INT           NOT NULL DEFAULT 0,
   duration_limit_sec INT         NOT NULL DEFAULT 3600,
   settings_json    JSON          NULL,              -- 拍摄要求/防作弊开关
+  invite_token_hash VARCHAR(64)  NULL,              -- sha256(邀请 token)，明文只在邀请链接（V1_3）
+  invite_expire_at DATETIME(3)  NULL,               -- 邀请链接过期时间（V1_3）
+  started_at       DATETIME(3)  NULL,               -- 候选人首次开始作答（V1_3）
+  submitted_at     DATETIME(3)  NULL,               -- 候选人提交时间（V1_3）
+  total_score      DECIMAL(5,2) NULL,               -- 加权总分，人工分优先（V1_3）
+  reviewed_by      BIGINT UNSIGNED NULL,            -- 最后人工复核人（V1_3）
+  reviewed_at      DATETIME(3)  NULL,               -- 最后人工复核时间（V1_3）
   created_by       BIGINT UNSIGNED NOT NULL,
   created_at       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at       DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   version          INT           NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   UNIQUE KEY uk_paper_no (paper_no),
-  UNIQUE KEY uk_application (application_id)
+  UNIQUE KEY uk_application (application_id),
+  UNIQUE KEY uk_invite_token (invite_token_hash),
+  KEY idx_status (status)
 ) COMMENT='异步面试试卷表（一份投递一份卷）';
 
 CREATE TABLE async_question (
@@ -274,6 +283,9 @@ CREATE TABLE async_answer (
   transcript_text  MEDIUMTEXT    NULL,              -- 逐题 ASR 转写
   ai_score         DECIMAL(5,2)  NULL,              -- AI 评分草稿
   manual_score     DECIMAL(5,2)  NULL,              -- 人工复核分
+  manual_comment   VARCHAR(1024) NULL,              -- 人工复核评语（V1_3）
+  manual_scored_by BIGINT UNSIGNED NULL,            -- 人工复核人（V1_3）
+  manual_scored_at DATETIME(3)   NULL,              -- 人工复核时间（V1_3）
   status           VARCHAR(16)   NOT NULL DEFAULT 'PENDING', -- PENDING/SUBMITTED/TRANSCRIBED/AI_SCORED/REVIEWED
   submitted_at     DATETIME(3)   NULL,
   created_at       DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3),

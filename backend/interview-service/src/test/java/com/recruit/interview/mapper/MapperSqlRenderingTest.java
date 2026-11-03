@@ -1,6 +1,7 @@
 package com.recruit.interview.mapper;
 
 import com.recruit.interview.entity.Job;
+import com.recruit.interview.mapper.AsyncPaperMapper;
 import com.recruit.interview.support.ScheduleParticipant;
 import com.recruit.interview.support.ScheduleSlotKey;
 import org.apache.ibatis.annotations.Select;
@@ -180,6 +181,46 @@ class MapperSqlRenderingTest {
 
         assertThat(sql).contains("status = 'EXPIRED'").contains("version = version + 1")
                 .contains("status = 'SENT' AND expire_at < CURRENT_TIMESTAMP(3)");
+    }
+
+    @Test
+    void asyncPaperPageRendersScopeAndKeyword() throws Exception {
+        String sql = render(AsyncPaperMapper.class, "selectPaperPage", Map.class,
+                params("keyword", "张", "status", "RELEASED", "jobId", 50001L,
+                        "applicationId", 51001L, "scope", "DEPARTMENT",
+                        "deptIds", List.of(20001L), "userId", 10001L,
+                        "limit", 20, "offset", 0L));
+
+        assertThat(sql).contains("JOIN application a ON a.id = p.application_id")
+                .contains("p.paper_no LIKE").contains("j.dept_id IN")
+                .doesNotContain("j.owner_hr_id = ?");
+    }
+
+    @Test
+    void asyncPaperUpdateDraftOmitsQuestionCountWhenNull() throws Exception {
+        String without = render(AsyncPaperMapper.class, "updateDraft", Map.class,
+                params("id", 93001L, "durationLimitSec", 1800, "settingsJson", null,
+                        "questionCount", null, "version", 0));
+        assertThat(without).doesNotContain("question_count")
+                .contains("status = 'DRAFT'").contains("version = version + 1");
+
+        String with = render(AsyncPaperMapper.class, "updateDraft", Map.class,
+                params("id", 93001L, "durationLimitSec", 1800, "settingsJson", "{}",
+                        "questionCount", 3, "version", 0));
+        assertThat(with).contains("question_count = ?");
+    }
+
+    @Test
+    void asyncPaperMarkScoredOmitsReviewerWhenNull() throws Exception {
+        String without = render(AsyncPaperMapper.class, "markScored", Map.class,
+                params("id", 93001L, "totalScore", new java.math.BigDecimal("85.00"),
+                        "reviewedBy", null, "reviewedAt", null, "version", 2));
+        assertThat(without).contains("status = 'SCORED'").doesNotContain("reviewed_by");
+
+        String with = render(AsyncPaperMapper.class, "markScored", Map.class,
+                params("id", 93001L, "totalScore", new java.math.BigDecimal("85.00"),
+                        "reviewedBy", 10001L, "reviewedAt", LocalDateTime.now(), "version", 2));
+        assertThat(with).contains("reviewed_by = ?").contains("reviewed_at = ?");
     }
 
     private static String render(Class<?> mapper, String methodName, Class<?> parameterType,

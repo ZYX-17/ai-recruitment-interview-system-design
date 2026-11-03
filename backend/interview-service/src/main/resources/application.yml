@@ -62,3 +62,7 @@ logging:
 recruit:
   security:
     internal-token: ${INTERNAL_TOKEN:}
+  async:
+    # 门户异步面试邀请链接前缀；明文 token 只拼在链接里，不落库/不进 MQ
+    invite-base-url: ${ASYNC_INVITE_BASE_URL:http://localhost:5173/portal/async-interview}
+    invite-ttl-hours: ${ASYNC_INVITE_TTL_HOURS:168}

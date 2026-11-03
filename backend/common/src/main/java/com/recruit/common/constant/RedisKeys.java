@@ -81,6 +81,9 @@ public final class RedisKeys {
      */
     public static final String OFFER_CONFIRM = "offer:confirm:";
 
+    /** 异步面试邀请链接缓存前缀；只缓存 10 分钟，明文不落库。 */
+    public static final String ASYNC_INVITE = "async:invite:";
+
     // ==================== 幂等 ====================
 
     /**
@@ -200,6 +203,16 @@ public final class RedisKeys {
      */
     public static String offerConfirm(String offerId) {
         return OFFER_CONFIRM + requireSegment(offerId, "offerId");
+    }
+
+    /**
+     * 构造异步面试邀请链接缓存 Key。
+     *
+     * @param paperId 试卷 ID，不能为空
+     * @return async:invite:{paperId}
+     */
+    public static String asyncInvite(String paperId) {
+        return ASYNC_INVITE + requireSegment(paperId, "paperId");
     }
 
     /**
