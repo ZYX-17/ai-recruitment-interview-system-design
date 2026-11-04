@@ -64,5 +64,8 @@ logging:
 
 # 通知发送开关：false 时邮件只打印日志，站内信仍落库
 recruit:
+  security:
+    # 服务间内部接口令牌（调 auth-service 时携带）
+    internal-token: ${INTERNAL_TOKEN:}
   notify:
     mail-enabled: ${MAIL_ENABLED:true}

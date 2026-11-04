@@ -1,0 +1,25 @@
+# 本地联调 profile（--spring.profiles.active=local）：不依赖 Nacos。
+# 网关路由仍是 lb://<service>，由 SimpleDiscoveryClient 提供固定实例地址。
+spring:
+  cloud:
+    nacos:
+      config:
+        enabled: false
+      discovery:
+        enabled: false
+    discovery:
+      client:
+        simple:
+          instances:
+            auth-service:
+              - uri: ${AUTH_SERVICE_URI:http://127.0.0.1:8081}
+            interview-service:
+              - uri: ${INTERVIEW_SERVICE_URI:http://127.0.0.1:8083}
+            notify-service:
+              - uri: ${NOTIFY_SERVICE_URI:http://127.0.0.1:8086}
+            resume-service:
+              - uri: ${RESUME_SERVICE_URI:http://127.0.0.1:8084}
+            room-service:
+              - uri: ${ROOM_SERVICE_URI:http://127.0.0.1:8085}
+            file-service:
+              - uri: ${FILE_SERVICE_URI:http://127.0.0.1:8087}

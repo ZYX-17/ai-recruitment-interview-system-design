@@ -72,6 +72,8 @@ recruit:
     # 轮换期旧公钥：kid -> 公钥路径；旧公钥至少保留一个 Access TTL
     previous-public-keys: {}
   security:
+    # 服务间内部接口令牌（/internal/** 必填；未配置时 fail-closed）
+    internal-token: ${INTERNAL_TOKEN:}
     # 手机号 AES 密钥（Base64 的 16/24/32 字节）；未配置时新增用户不能填手机号
     phone-enc-key: ${PHONE_ENC_KEY:}
     # Refresh Token 只走 HttpOnly Cookie，浏览器脚本不可读
